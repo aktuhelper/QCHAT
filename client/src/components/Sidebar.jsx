@@ -25,6 +25,7 @@ const Sidebar = () => {
   const [loadingFriendRequests, setLoadingFriendRequests] = useState(true);
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [loadingConversations, setLoadingConversations] = useState(true);
 
   const fetchFriendRequests = useCallback(async () => {
     try {
@@ -67,16 +68,19 @@ const Sidebar = () => {
 
   useEffect(() => {
     if (!socket || !userdata?._id) return;
-
-    // Register user on socket
+  
     socket.emit("register-user", userdata._id);
     console.log("Registering socket for user:", userdata._id);
-
-    // Initial fetch of conversations
+  
+    // Show loading before fetching
+    setLoadingConversations(true);
     socket.emit("fetchConversations");
-
-    // Setup socket listeners
-    socket.on("conversation", (convos) => setConversations(convos.length === 0 ? [] : convos));
+  
+    socket.on("conversation", (convos) => {
+      setConversations(convos.length === 0 ? [] : convos);
+      setLoadingConversations(false); // Done loading
+    });
+  
     socket.on("message", ({ senderId, receiverId, message }) => {
       if (receiverId === userdata._id) {
         setUnreadCounts((prev) => ({
@@ -85,14 +89,13 @@ const Sidebar = () => {
         }));
       }
     });
-    
+  
     socket.on("onlineUsers", (users) => setOnlineUsers(users));
     socket.on("receive-friend-request", (request) => {
       setFriendRequests((prev) => [request, ...prev]);
       toast.info(`New friend request from ${request.sender.name}`);
     });
-
-    // Cleanup listeners on unmount or re-run
+  
     return () => {
       socket.off("conversation");
       socket.off("onlineUsers");
@@ -100,6 +103,7 @@ const Sidebar = () => {
       socket.off("receive-friend-request");
     };
   }, [socket, userdata?._id]);
+  
 
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -305,7 +309,7 @@ const Sidebar = () => {
 
       {/* ✅ Green unread badge */}
       {unread > 0 && (
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+       <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
           {unread}
         </span>
       )}
@@ -318,6 +322,11 @@ const Sidebar = () => {
                   </>
                 )}
               </>
+              ) : loadingConversations ? (
+                <div className="flex flex-col justify-center items-center mt-10 text-slate-400">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-blue-500 border-solid mb-4"></div>
+                <p className="text-sm">Fetching conversations...</p>
+              </div>
             ) : conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center mt-10 text-slate-400">
                 <GoArrowUpLeft size={50} />
@@ -349,21 +358,21 @@ const Sidebar = () => {
                     height={42}
                     className="rounded-full"
                   />
-                  <div className="flex flex-col overflow-hidden w-full">
-                    <h3 className="truncate font-semibold text-white">
-                      {otherUser.name} {isOnline && <span className="text-green-500">⦿</span>}
-                    </h3>
-                    <div className="text-slate-300 text-xs truncate">
-                      {conv?.lastMsg?.imageUrl ? (
-                        <span className="flex items-center gap-1">
-                          <FaImage /><span>Image</span>
-                        </span>
-                      ) : (
-                        <span className="truncate">{conv?.lastMsg?.text}</span>
-                      )}
-                    </div>
-                  </div>
-            
+               <div className="flex flex-col overflow-hidden w-full">
+  <h3 className="truncate font-semibold text-white">
+    {otherUser.name} {isOnline && <span className="text-green-500">⦿</span>}
+  </h3>
+  <div className="text-slate-300 text-xs overflow-hidden whitespace-nowrap text-ellipsis break-all max-w-[160px]">
+    {conv?.lastMsg?.imageUrl ? (
+      <span className="flex items-center gap-1">
+        <FaImage /><span>Image</span>
+      </span>
+    ) : (
+      <span>{conv?.lastMsg?.text}</span>
+    )}
+  </div>
+</div>
+
                   {/* ✅ Green unread badge on the right */}
                   {unread > 0 && (
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
