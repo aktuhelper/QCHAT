@@ -28,7 +28,7 @@ const port = process.env.PORT || 4000;
 const __dirname= path.resolve();
 connectDB();
 
-const allowedOrigins = ['http://localhost:5173'];
+const allowedOrigins = ['https://qchat-7gsn.onrender.com'];
 
 app.use(express.json());
 app.use(cookieParser());
