@@ -4,7 +4,7 @@ import usermodel from '../database/usermodel.js';
 import transporter from '../config/nodemailer.js';
 import dotenv from 'dotenv';
 import { EMAIL_VERIFY_TEMPLATE, PASSWORD_RESET_TEMPLATE } from '../config/emailTemplates.js';
-
+import { OAuth2Client } from 'google-auth-library';
 dotenv.config();
 
 const isValidEnvVariable = (variable, name) => {
@@ -244,3 +244,52 @@ export const resetpassword = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+export const googleLogin = async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ success: false, message: 'Google token is required' });
+  }
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture } = payload;
+
+    let user = await usermodel.findOne({ email });
+
+    if (!user) {
+      // Create a new user if not exists
+      user = new usermodel({
+        name,
+        email,
+        password: '', // optional, if you want to keep password login separate
+        isAccountverified: true, // assume verified since Google verified the email
+        avatar: picture,
+        provider: 'google',
+      });
+      await user.save();
+    }
+
+    const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.cookie('token', jwtToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return res.status(200).json({ success: true, message: 'Logged in with Google', user });
+  } catch (error) {
+    console.error('Google login error:', error.message);
+    return res.status(401).json({ success: false, message: 'Invalid Google token' });
+  }
+};
+

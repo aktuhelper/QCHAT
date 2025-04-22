@@ -1,0 +1,18 @@
+/* Define the keyframes for the wave animation */
+@keyframes wave {
+    0% {
+      transform: rotate(0deg);
+    }
+    50% {
+      transform: rotate(15deg); /* Simulate a wave effect */
+    }
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+  
+  /* Apply the animation */
+  .animate-wave {
+    animation: wave 1.5s infinite;
+  }
+  

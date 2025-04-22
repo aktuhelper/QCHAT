@@ -67,7 +67,7 @@ const VerifyEmail = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen ">
-       <img onClick={() => navigate('/')} src={assets.chat_logo} alt="" className='absolute left-5 sm:left-20 top-5 w-25 sm:w-20 cursor-pointer'/>
+      
       <form onSubmit={onSubmitHandler} className="bg-[#1A1A1A] p-6 rounded-lg shadow-lg w-96 text-sm">
         <h1 className="text-white text-2xl font-semibold text-center mb-4">Email Verify OTP</h1>
         <p className="text-center mb-6 text-indigo-300">Enter 6 digit code sent to your Email</p>

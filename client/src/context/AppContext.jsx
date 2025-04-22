@@ -10,7 +10,7 @@ export const AppContextProvider = (props) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   const [socket, setSocket] = useState(null);
-  const [isLoggedin, setIsLoggedin] = useState(false);
+  const [isLoggedin, setIsLoggedin] = useState(undefined);
   const [userdata, setUserdata] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [onlineUsersCount, setOnlineUsersCount] = useState(0);

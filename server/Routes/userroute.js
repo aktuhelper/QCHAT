@@ -7,11 +7,10 @@ import searchUser from '../controllers/searchuser.js';
 
 const userRouter = express.Router();
 
-
-userRouter.get('/data', userAuth, getUserData);  // ✅ This is the primary route to fetch user data
-
-
+userRouter.get('/data', userAuth, getUserData);  
 userRouter.post('/update', userAuth, updateUserDetails);
-
 userRouter.get('/searchuser', searchUser);
+
+
+
 export default userRouter;

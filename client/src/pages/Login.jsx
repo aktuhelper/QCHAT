@@ -5,7 +5,7 @@ import { AppContent } from '../context/AppContext';
 import axios from 'axios'; 
 import { toast } from 'react-toastify';
 import { Loader2 } from 'lucide-react';
-
+import { GoogleLogin } from '@react-oauth/google';
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -84,8 +84,10 @@ const Login = () => {
 
   return (
     <div className='flex items-center justify-center min-h-screen px-6 sm:px-0'>
-      <img onClick={() => navigate('/')} src={assets.chat_logo} alt="" className='absolute left-5 sm:left-20 top-5 w-25 sm:w-20 cursor-pointer'/>
+      {/* Qchat Title */}
+    
 
+      {/* Login/Signup Form Card */}
       <div className='bg-[#1A1A1A] p-10 rounded-lg shadow-lg w-full sm:w-96 text-white'>
         <h2 className='text-3xl font-semibold text-center m-3'>{state === 'Sign Up' ? 'Create Account' : 'Login'}</h2>
         <p className='text-center text-sm mb-6'>{state === 'Sign Up' ? 'Create your account' : 'Login to Your account'}</p>
@@ -140,12 +142,33 @@ const Login = () => {
         </form>
 
         {/* Google Authentication Button */}
-        <div className='mt-4 mb-4 flex items-center justify-center'>
-          <button onClick={handleGoogleAuth} className='w-full py-2.5 rounded-full bg-white text-black font-medium flex items-center justify-center gap-3'>
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/2048px-Google_%22G%22_logo.svg.png" alt="Google" className='w-6 h-6'/>
-            <span>{state === 'Sign Up' ? 'Sign Up with Google' : 'Sign In with Google'}</span>
-          </button>
-        </div>
+        <div className="mt-4 mb-4 flex items-center justify-center">
+  <GoogleLogin
+    onSuccess={async (credentialResponse) => {
+      try {
+        const { credential } = credentialResponse;
+        const { data } = await axios.post(`${backendUrl}/api/auth/google-login`, {
+          token: credential
+        }, { withCredentials: true });
+
+        if (data.success) {
+          setIsLoggedin(true);
+          await getUserData();
+          toast.success(data.message);
+          navigate('/');
+        } else {
+          toast.error(data.message);
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Google login failed.");
+      }
+    }}
+    onError={() => {
+      toast.error("Google Sign In was unsuccessful. Try again.");
+    }}
+  />
+</div>
+
 
         {state === 'Sign Up' ? (
           <p className='text-gray-400 text-center text-xs mt-4'>

@@ -79,7 +79,7 @@ const ResetPassword = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen ">
-      <img onClick={() => navigate('/')} src={assets.chat_logo} alt="" className='absolute left-5 sm:left-20 top-5 w-25 sm:w-20 cursor-pointer'/>
+     
       {/* Enter email Id */}
       {!isEmailSent && (
         <form onSubmit={onSubmitEmail} className="bg-[#1A1A1A] p-6 rounded-lg shadow-lg w-96 text-sm">

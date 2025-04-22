@@ -26,27 +26,58 @@ export const handleSocketConnection = (io) => {
             return;
         }
 
-        // Store user details
-        userSockets.set(user._id.toString(), socket.id);
-        onlineUsers.set(user._id.toString(), user);
-        io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+        // Check that user._id exists before using .toString()
+        if (user && user._id) {
+            userSockets.set(user._id.toString(), socket.id);
+            onlineUsers.set(user._id.toString(), user);
+            io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+        } else {
+            console.error('User or user._id is undefined');
+            socket.disconnect();
+            return;
+        }
 
         // Send chat list on connection
         const chatList = await getConversation(userId);
         socket.emit("conversation", chatList);
 
-        // Fetch conversations
-        socket.on("fetchConversations", async () => {
-            const conversations = await getConversation(userId);
-            socket.emit("conversation", conversations);
+        // Typing Indicator: Listen for 'typing' event
+        socket.on("typing", (data) => {
+            const { senderId, receiverId } = data;
+
+            // Validate receiverId
+            if (receiverId && mongoose.Types.ObjectId.isValid(receiverId)) {
+                const receiverSocket = userSockets.get(receiverId.toString());
+                if (receiverSocket) {
+                    // Emit typing indicator to receiver
+                    io.to(receiverSocket).emit("typing", { senderId });
+                }
+            }
         });
 
-        // Typing Indicator
-    
+        // Typing Indicator: Listen for 'stop-typing' event
+        socket.on("stop-typing", (data) => {
+            const { senderId, receiverId } = data;
+
+            // Validate receiverId
+            if (receiverId && mongoose.Types.ObjectId.isValid(receiverId)) {
+                const receiverSocket = userSockets.get(receiverId.toString());
+                if (receiverSocket) {
+                    // Emit stop-typing indicator to receiver
+                    io.to(receiverSocket).emit("stop-typing", { senderId });
+                }
+            }
+        });
 
         // Fetch messages
         socket.on("message-page", async (chatuserId) => {
             try {
+                if (!mongoose.Types.ObjectId.isValid(chatuserId)) {
+                    console.error("Invalid chat user ID");
+                    socket.emit("message", []);
+                    return;
+                }
+
                 let conversation = await ConversationModel.findOne({
                     "$or": [
                         { sender: user._id, receiver: chatuserId },
@@ -77,26 +108,34 @@ export const handleSocketConnection = (io) => {
         // Handle new messages
         socket.on("newMessage", async (data, callback) => {
             try {
-                const sender = data.senderId;
-                const receiver = data.receiverId;
+                const { senderId, receiverId, text, imageUrl, videoUrl } = data;
+
+                // Validate senderId and receiverId
+                if (!senderId || !receiverId) {
+                    return callback({ success: false, error: "Missing senderId or receiverId" });
+                }
+
+                if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
+                    return callback({ success: false, error: "Invalid senderId or receiverId" });
+                }
 
                 let conversation = await ConversationModel.findOne({
                     "$or": [
-                        { sender: sender, receiver: receiver },
-                        { sender: receiver, receiver: sender },
+                        { sender: senderId, receiver: receiverId },
+                        { sender: receiverId, receiver: senderId },
                     ],
                 });
 
                 if (!conversation) {
-                    conversation = new ConversationModel({ sender, receiver, messages: [] });
+                    conversation = new ConversationModel({ sender: senderId, receiver: receiverId, messages: [] });
                     await conversation.save();
                 }
 
                 const message = new MessageModel({
-                    text: data.text,
-                    imageUrl: data.imageUrl || "",
-                    videoUrl: data.videoUrl || "",
-                    msgByUserId: sender,
+                    text: text,
+                    imageUrl: imageUrl || "",
+                    videoUrl: videoUrl || "",
+                    msgByUserId: senderId,
                     seen: false,
                 });
 
@@ -104,26 +143,30 @@ export const handleSocketConnection = (io) => {
                 conversation.messages.push(message._id);
                 await conversation.save();
 
-                const updatedConversation = await ConversationModel.findById(conversation._id)
-                    .populate("messages");
+                const updatedConversation = await ConversationModel.findById(conversation._id).populate("messages");
 
                 const updatedMessages = updatedConversation.messages.map(msg => ({
                     ...msg.toObject(),
                     senderId: msg.msgByUserId,
                 }));
 
-                const senderSocket = userSockets.get(sender.toString());
-                const receiverSocket = userSockets.get(receiver.toString());
+                const senderSocket = userSockets.get(senderId.toString());
+                const receiverSocket = userSockets.get(receiverId.toString());
 
                 if (senderSocket) io.to(senderSocket).emit("message", updatedMessages);
                 if (receiverSocket) {
-                    io.to(receiverSocket).emit("message", updatedMessages);
+                    io.to(receiverSocket).emit("message", {
+                      senderId,
+                      receiverId,
+                      message: message.toObject(),
+                    });
                     io.to(receiverSocket).emit("message-user", { online: true });
-                }
+                  }
+                  
 
                 // Update chat lists
-                const senderChatList = await getConversation(sender);
-                const receiverChatList = await getConversation(receiver);
+                const senderChatList = await getConversation(senderId);
+                const receiverChatList = await getConversation(receiverId);
 
                 if (senderSocket) io.to(senderSocket).emit("conversation", senderChatList);
                 if (receiverSocket) io.to(receiverSocket).emit("conversation", receiverChatList);
@@ -139,29 +182,9 @@ export const handleSocketConnection = (io) => {
             }
         });
 
-        // Handle user going online
-        socket.on("user-online", async (userId) => {
-            onlineUsers.set(userId, user);
-            io.emit("onlineUsers", Array.from(onlineUsers.keys()));
-
-            const chatList = await getConversation(userId);
-            const userSocket = userSockets.get(userId.toString());
-            if (userSocket) io.to(userSocket).emit("conversation", chatList);
-        });
-
-        // Handle user going offline
-        socket.on("user-offline", async (userId) => {
-            onlineUsers.delete(userId);
-            io.emit("onlineUsers", Array.from(onlineUsers.keys()));
-
-            const chatList = await getConversation(userId);
-            const userSocket = userSockets.get(userId.toString());
-            if (userSocket) io.to(userSocket).emit("conversation", chatList);
-        });
-
         // Handle user disconnect gracefully
         socket.on("disconnect", () => {
-            if (user) {
+            if (user && user._id) {
                 userSockets.delete(user._id.toString());
                 onlineUsers.delete(user._id.toString());
                 io.emit("onlineUsers", Array.from(onlineUsers.keys()));

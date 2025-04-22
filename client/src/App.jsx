@@ -4,24 +4,49 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import VerifyEmail from './pages/VerifyEmail';
 import ResetPassword from './pages/ResetPassword';
-import MessagePage from './components/MessagePage'; // Import MessagePage
+import MessagePage from './components/MessagePage';
+import RandomChatPage from './components/randomChatPage';
+import PrivateRoute from './components/PrivateRoute'; // Make sure this path is correct
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
-import RandomChatPage from './components/randomChatPage';
 
 const App = () => {
   return (
     <div>
       <ToastContainer />
       <Routes>
-        <Route path='/' element={<Home />}>
-          <Route path=":userId" element={<MessagePage />} />
+        {/* Protected Routes */}
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <Home />
+            </PrivateRoute>
+          }
+        >
+          <Route
+            path=":userId"
+            element={
+              <PrivateRoute>
+                <MessagePage />
+              </PrivateRoute>
+            }
+          />
         </Route>
-        <Route path='/login' element={<Login />} />
-        <Route path='/randomChat' element={<RandomChatPage />} /> {/* Keep this one */}
-        <Route path='/email-verify' element={<VerifyEmail />} />
-        <Route path='/reset-password' element={<ResetPassword />} />
+
+        <Route
+          path="/randomChat"
+          element={
+            <PrivateRoute>
+              <RandomChatPage />
+            </PrivateRoute>
+          }
+        />
+        {/* Public Routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/email-verify" element={<VerifyEmail />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </div>
   );
