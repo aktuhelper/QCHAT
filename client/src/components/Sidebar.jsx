@@ -324,31 +324,36 @@ const Sidebar = () => {
               </>
               ) : loadingConversations ? (
                 <div className="flex flex-col justify-center items-center mt-10 text-slate-400">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-blue-500 border-solid mb-4"></div>
-                <p className="text-sm">Fetching conversations...</p>
-              </div>
-            ) : conversations.length === 0 ? (
-              <div className="flex flex-col items-center justify-center mt-10 text-slate-400">
-                <GoArrowUpLeft size={50} />
-                <p className="mt-4">Explore users to start a conversation.</p>
-              </div>
-            ) : (
-              conversations.map((conv) => {
-                const otherUser = conv.sender._id === userdata._id ? conv.receiver : conv.sender;
-                const isOnline = onlineUsers.includes(otherUser?._id);
-                const unread = unreadCounts[otherUser._id] || 0;
-                return (
-                  <NavLink
-                  to={`/${otherUser._id}`}
-                  state={{ recipient: otherUser }}
-                  key={conv._id}
-                  onClick={() =>
-                    setUnreadCounts((prev) => {
-                      const updated = { ...prev };
-                      delete updated[otherUser._id];
-                      return updated;
-                    })
-                  }
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-blue-500 border-solid mb-4"></div>
+                  <p className="text-sm">Fetching conversations...</p>
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center mt-10 text-slate-400">
+                  <GoArrowUpLeft size={50} />
+                  <p className="mt-4 text-lg font-semibold text-center">
+                    No conversations yet.
+                  </p>
+                  <p className="mt-2 text-sm text-center text-gray-500">
+                    Explore users to start a conversation.
+                  </p>
+                </div>
+              ) : (
+                conversations.map((conv) => {
+                  const otherUser = conv.sender._id === userdata._id ? conv.receiver : conv.sender;
+                  const isOnline = onlineUsers.includes(otherUser?._id);
+                  const unread = unreadCounts[otherUser._id] || 0;
+                  return (
+                    <NavLink
+                      to={`/${otherUser._id}`}
+                      state={{ recipient: otherUser }}
+                      key={conv._id}
+                      onClick={() =>
+                        setUnreadCounts((prev) => {
+                          const updated = { ...prev };
+                          delete updated[otherUser._id];
+                          return updated;
+                        })
+                      }
                   className="relative flex items-center gap-3 py-3 px-2 hover:bg-black/40 hover:backdrop-blur-sm rounded-full cursor-pointer"
                 >
                   <Avatar

@@ -1,35 +1,49 @@
 import React, { useContext, useState } from 'react';
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
 import { assets } from '../assets/assets';
 import { AppContent } from '../context/AppContext';
-import axios from 'axios'; 
+import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Loader2 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
+
+// Function to base64 URL decode
+const base64UrlDecode = (base64Url) => {
+  // Replace base64 URL-safe characters
+  let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  // Pad with '=' to make it a valid base64 string
+  base64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+  // Decode the base64 string into a string
+  const decoded = atob(base64);
+  return decoded;
+};
+
+// Function to decode JWT
+const decodeJwt = (token) => {
+  if (!token) return null;
+  
+  // Split token into parts
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Invalid token format');
+  }
+
+  // Decode the payload part (the second part of the JWT)
+  const payload = parts[1];
+  const decodedPayload = base64UrlDecode(payload);
+  
+  // Parse the JSON string to an object
+  return JSON.parse(decodedPayload);
+};
+
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { backendUrl, setIsLoggedin, getUserData } = useContext(AppContent);
+  const { backendUrl, setIsLoggedin, getUserData, googleLogin } = useContext(AppContent); // Access googleLogin
   const [state, setState] = useState('Sign Up');
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const sendVerifyOtp = async () => {
-    try {
-      axios.defaults.withCredentials = true;
-      const { data } = await axios.post(backendUrl + '/api/auth/send-verify-otp');
-      if (data.success) {
-        navigate('/email-verify');
-        toast.success(data.message);
-      } else {
-        toast.error(data.message);
-      }
-    } catch (error) {
-      const errorMessage = error.response ? error.response.data.message : error.message;
-      toast.error(errorMessage);
-    }
-  }
 
   const onSubmitHandler = async (e) => {
     e.preventDefault();
@@ -43,18 +57,12 @@ const Login = () => {
         if (data.data.success) {
           setIsLoggedin(true);
           getUserData();
-          try {
-            axios.defaults.withCredentials = true;
-            const { data } = await axios.post(backendUrl + '/api/auth/send-verify-otp');
-            if (data.success) {
-              navigate('/email-verify');
-              toast.success(data.message);
-            } else {
-              toast.error(data.message);
-            }
-          } catch (error) {
-            const errorMessage = error.response ? error.response.data.message : error.message;
-            toast.error(errorMessage);
+          const otpRes = await axios.post(backendUrl + '/api/auth/send-verify-otp');
+          if (otpRes.data.success) {
+            navigate('/email-verify');
+            toast.success(otpRes.data.message);
+          } else {
+            toast.error(otpRes.data.message);
           }
         } else {
           toast.error(data.data.message);
@@ -76,21 +84,36 @@ const Login = () => {
     }
   };
 
-  const handleGoogleAuth = () => {
-    // Handle Google OAuth logic here (sign up or sign in depending on the state)
-    console.log(state === 'Sign Up' ? 'Google Sign Up clicked' : 'Google Sign In clicked');
-    // For actual implementation, integrate with Google OAuth API
+  const handleGoogleLogin = async (credentialResponse) => {
+    try {
+      const { credential } = credentialResponse;
+
+      // Decode the Google ID token manually
+      const decoded = decodeJwt(credential);
+      const { name, email, picture } = decoded;
+
+      console.log("Google User Info:", { name, email, picture });
+
+      // Call googleLogin from AppContext to handle user data
+      await googleLogin(credential); // Ensure that googleLogin is used here
+
+      toast.success(`Welcome ${name.split(' ')[0]}!`);
+      navigate('/');
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Google login failed.");
+    }
   };
 
   return (
     <div className='flex items-center justify-center min-h-screen px-6 sm:px-0'>
-      {/* Qchat Title */}
-    
-
-      {/* Login/Signup Form Card */}
       <div className='bg-[#1A1A1A] p-10 rounded-lg shadow-lg w-full sm:w-96 text-white'>
-        <h2 className='text-3xl font-semibold text-center m-3'>{state === 'Sign Up' ? 'Create Account' : 'Login'}</h2>
-        <p className='text-center text-sm mb-6'>{state === 'Sign Up' ? 'Create your account' : 'Login to Your account'}</p>
+        <h2 className='text-3xl font-semibold text-center m-3'>
+          {state === 'Sign Up' ? 'Create Account' : 'Login'}
+        </h2>
+        <p className='text-center text-sm mb-6'>
+          {state === 'Sign Up' ? 'Create your account' : 'Login to Your account'}
+        </p>
+
         <form onSubmit={onSubmitHandler}>
           {state === 'Sign Up' && (
             <div className='mb-4 flex items-center gap-3 w-full px-5 py-2.5 rounded-full bg-[#1f1f20]'>
@@ -105,6 +128,7 @@ const Login = () => {
               />
             </div>
           )}
+
           <div className='mb-4 flex items-center gap-3 w-full px-5 py-2.5 rounded-full bg-[#1f1f20]'>
             <img src={assets.mail_icon} alt="" className='w-5 h-5'/>
             <input 
@@ -116,6 +140,7 @@ const Login = () => {
               required 
             />
           </div>
+
           <div className='mb-4 flex items-center gap-3 w-full px-5 py-2.5 rounded-full bg-[#1f1f20]'>
             <img src={assets.lock_icon} alt="" className='w-5 h-5'/>
             <input 
@@ -127,7 +152,10 @@ const Login = () => {
               required 
             />
           </div>
-          <p onClick={() => navigate('/reset-password')} className='mb-4 text-indigo-500 cursor-pointer'>Forgot Password?</p>
+
+          <p onClick={() => navigate('/reset-password')} className='mb-4 text-indigo-500 cursor-pointer'>
+            Forgot Password?
+          </p>
 
           <button className='w-full py-2.5 rounded-full bg-gradient-to-r from-red-500 to-red-900 text-white font-medium'>
             {loading ? (
@@ -143,32 +171,13 @@ const Login = () => {
 
         {/* Google Authentication Button */}
         <div className="mt-4 mb-4 flex items-center justify-center">
-  <GoogleLogin
-    onSuccess={async (credentialResponse) => {
-      try {
-        const { credential } = credentialResponse;
-        const { data } = await axios.post(`${backendUrl}/api/auth/google-login`, {
-          token: credential
-        }, { withCredentials: true });
-
-        if (data.success) {
-          setIsLoggedin(true);
-          await getUserData();
-          toast.success(data.message);
-          navigate('/');
-        } else {
-          toast.error(data.message);
-        }
-      } catch (error) {
-        toast.error(error.response?.data?.message || "Google login failed.");
-      }
-    }}
-    onError={() => {
-      toast.error("Google Sign In was unsuccessful. Try again.");
-    }}
-  />
-</div>
-
+          <GoogleLogin
+            onSuccess={handleGoogleLogin}
+            onError={() => {
+              toast.error("Google Sign In was unsuccessful. Try again.");
+            }}
+          />
+        </div>
 
         {state === 'Sign Up' ? (
           <p className='text-gray-400 text-center text-xs mt-4'>
