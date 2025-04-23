@@ -13,6 +13,7 @@ import {
   sendMessage,
   handleDisconnect,
   endChat,
+  handleTyping
 } from './socket/randomchatSocket.js'; // Updated random chat logic
 import router from './Routes/convid.js';
 import FriendRequest from './database/FriendRequestModel.js';
@@ -67,7 +68,11 @@ io.on('connection', (socket) => {
     userSockets[userId] = socket.id;
     console.log(`User ${userId} is connected with socket ${socket.id}`);
   });
-
+  //typing indicator in random chat
+  socket.on('typing', (chatRoomId, senderId, isTyping) => {
+    console.log(`User ${senderId} is ${isTyping ? 'typing...' : 'not typing'} in ${chatRoomId}`);
+    handleTyping(io, chatRoomId, senderId, isTyping);
+  });
   // Friend request handling
   socket.on('send-friend-request', async (senderId, receiverId) => {
     try {

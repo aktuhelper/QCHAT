@@ -72,7 +72,12 @@ const RandomChatPage = () => {
         setTimeout(() => setPopupVisible(false), 3000);
       });
 
-      socket.on("typing", setIsTyping);
+      socket.on("typing-status", ({ senderId, isTyping: typingStatus, chatRoomId: typingRoomId }) => {
+        if (typingRoomId === chatRoomId && senderId === randomUser?.userId) {
+          setIsTyping(typingStatus);
+        }
+      });
+      
 
       socket.on('friendRequestResponse', (data) => {
         if (data.status === 'sent' || data.status === 'accepted') {
@@ -219,7 +224,24 @@ const RandomChatPage = () => {
     setFriendStatus("");
     setErrorMessage("");
   };
+  const typingTimeoutRef = useRef(null);
 
+  const handleTyping = (text) => {
+    setMessage({ ...message, text });
+  
+    if (chatRoomId && userdata?._id) {
+      socket.emit("typing", chatRoomId, userdata._id, true);
+  
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+  
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("typing", chatRoomId, userdata._id, false);
+      }, 1500); // Emit stop typing after 1.5 seconds of inactivity
+    }
+  };
+  
   return (
     <div className="h-screen flex flex-col text-white bg-[url('../assets/bg.jpg')] bg-cover bg-center bg-no-repeat relative overflow-hidden">
       <header className="fixed top-0 left-0 right-0 h-16 bg-[#1A1A1A] flex justify-between items-center px-4 shadow-md z-10">
@@ -339,11 +361,16 @@ const RandomChatPage = () => {
   );
 })}
   {/* Typing Indicator */}
-  {isTyping && randomUser && !allMessages.length && (
-    <div className="text-center text-gray-300 mt-4">
-      <span>{randomUser?.username} is typing...</span>
+  {isTyping && randomUser && (
+  <div className="flex items-center gap-2 mt-4 ml-2">
+    <Avatar width={30} height={30} imageUrl={randomUser?.profile_pic} />
+    <div className="typing-indicator text-sm text-gray-300 px-4 py-2 bg-[#2A2A2A] rounded-full flex items-center gap-2">
+      <span className="dot"></span>
+      <span className="dot"></span>
+      <span className="dot"></span>
     </div>
-  )}
+  </div>
+)}
 </div>
 
 
@@ -394,10 +421,9 @@ const RandomChatPage = () => {
       <input
         type="text"
         value={message.text}
-        onChange={(e) => {
-          setMessage({ ...message, text: e.target.value });
-          socket.emit("typing", e.target.value.length > 0);
-        }}
+        onChange={(e) => handleTyping(e.target.value)}
+
+        
         placeholder="Type a message..."
         className="w-full p-3 pl-12 pr-12 rounded-full bg-[#2A2A2A] text-white outline-none border border-gray-600"
       />

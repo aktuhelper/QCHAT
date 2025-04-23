@@ -148,3 +148,23 @@ export const endChat = (io, userId) => {
         }
     }
 };
+// Function to handle typing indicators
+export const handleTyping = (io, chatRoomId, senderId, isTyping) => {
+    const chat = activeChats[chatRoomId];
+
+    if (chat) {
+        const receiverId = Object.keys(chat.users).find(id => id !== senderId);
+        const receiverSocketId = chat.users[receiverId];
+
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('typing-status', {
+                senderId,
+                isTyping,
+                chatRoomId
+            });
+        }
+    } else {
+        console.error('Chat room not found for typing indicator!');
+    }
+};
+
