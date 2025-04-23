@@ -45,7 +45,9 @@ const MessagePage = () => {
       console.error("Error fetching conversation ID:", error);
     }
   };
-
+  useEffect(() => {
+    scrollToBottom();
+  }, []);
   useEffect(() => {
     const rawMessages = localStorage.getItem('allMessages');
     try {
@@ -81,6 +83,7 @@ const MessagePage = () => {
       }
     };
     
+   
     
 
     const handleReceiveMessage = (newMessage) => {
@@ -142,17 +145,20 @@ const MessagePage = () => {
       socket.off('stop-typing', handleStopTyping);
     };
   }, [socket, userId, recipient?._id]);// Ensure only necessary dependencies are included
+ 
   useEffect(() => {
-    fetchConversationId();
+    const timeout = setTimeout(() => {
+      if (currentMessage.current) {
+        currentMessage.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100); // Short delay ensures the message renders before scroll
   
-    if (isUserNearBottom()) {
-      scrollToBottom();
-    }
-  
-    const messagesWithoutImages = allMessages.map(({ imageUrl, ...msg }) => msg);
-    localStorage.setItem('allMessages', JSON.stringify(messagesWithoutImages));
-    
+    return () => clearTimeout(timeout);
   }, [allMessages]);
+  
+  
+  
+  
   
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -373,32 +379,38 @@ const typingTimeout = useRef(null)
       {/* Chat Messages */}
       <section className="flex-1 overflow-y-auto px-4 py-2">
   <div className="flex flex-col gap-2">
-    {allMessages.map((msg, index) => (
+  {allMessages.map((msg, index) => {
+  const isLastMessage = index === allMessages.length - 1;
+
+  return (
+    <div
+      key={msg._id || index}
+      ref={isLastMessage ? currentMessage : null} // ✅ Only attach ref to the last message
+      className={`flex justify-${msg.senderId === userdata?._id ? 'end' : 'start'} p-3 rounded-3xl min-w-[120px] min-h-[40px] shadow-lg`}
+    >
       <div
-        key={msg._id || index}
-        className={`flex justify-${msg.senderId === userdata?._id ? 'end' : 'start'} p-3 rounded-3xl min-w-[120px] min-h-[40px] shadow-lg`}
+        className={`${
+          msg.senderId === userdata?._id
+            ? 'bg-[#0078FF] text-white max-w-[45%] ml-auto'
+            : 'bg-[#1A1A1A] text-white max-w-[50%] mr-auto'
+        } p-3 rounded-3xl`}
       >
-        <div
-          className={`${
-            msg.senderId === userdata?._id
-              ? 'bg-[#0078FF] text-white max-w-[45%] ml-auto'
-              : 'bg-[#1A1A1A] text-white max-w-[50%] mr-auto'
-          } p-3 rounded-3xl`}
-        >
-          {msg.imageUrl && (
-            <img
-              src={msg.imageUrl}
-              className="max-w-full max-h-80 w-auto object-contain rounded-lg"
-              alt="Message"
-            />
-          )}
-          <p className="text-sm break-words">{msg.text}</p>
-          <p className="text-xs text-gray-200 text-right">
-            {moment(msg.createdAt).format('hh:mm A')}
-          </p>
-        </div>
+        {msg.imageUrl && (
+          <img
+            src={msg.imageUrl}
+            className="max-w-full max-h-80 w-auto object-contain rounded-lg"
+            alt="Message"
+          />
+        )}
+        <p className="text-sm break-words">{msg.text}</p>
+        <p className="text-xs text-gray-200 text-right">
+          {moment(msg.createdAt).format('hh:mm A')}
+        </p>
       </div>
-    ))}
+    </div>
+  );
+})}
+
 
     {/* Typing Indicator Bubble (receiver side) */}
     {isTyping && (
