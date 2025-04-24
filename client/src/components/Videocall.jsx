@@ -96,6 +96,7 @@ const VideoCall = () => {
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log("Sending ICE candidate", event.candidate); // Debug ICE candidate
         socket.emit("video-ice-candidate", {
           to: getPeerTarget(),
           candidate: event.candidate,
@@ -104,6 +105,7 @@ const VideoCall = () => {
     };
 
     pc.ontrack = (event) => {
+      console.log("Received remote stream:", event.streams); // Debug received stream
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
       }
@@ -136,6 +138,7 @@ const VideoCall = () => {
     await getMedia();
 
     const offer = incomingCallFrom.offer;
+    console.log("Offer received:", offer); // Debug offer
     await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peerConnection.current.createAnswer();
     await peerConnection.current.setLocalDescription(answer);
