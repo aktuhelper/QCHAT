@@ -96,7 +96,7 @@ const VideoCall = () => {
 
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }], 
     });
 
     pc.onicecandidate = (event) => {
@@ -118,14 +118,19 @@ const VideoCall = () => {
         // Check if the remote stream contains video tracks
         if (remoteStream.getVideoTracks().length > 0) {
           if (remoteVideoRef.current) {
+            // Set the remote stream before calling play()
             remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play()
-              .then(() => {
-                console.log("Remote video is playing");
-              })
-              .catch((error) => {
-                console.error("Error playing remote video:", error);
-              });
+
+            // Check if video is paused, only then call play()
+            if (remoteVideoRef.current.paused) {
+              remoteVideoRef.current.play()
+                .then(() => {
+                  console.log("Remote video is playing");
+                })
+                .catch((error) => {
+                  console.error("Error playing remote video:", error);
+                });
+            }
           }
         } else {
           console.error("No video tracks found in remote stream!");
