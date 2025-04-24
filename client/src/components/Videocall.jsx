@@ -35,6 +35,7 @@ const VideoCall = () => {
     });
 
     socket.on("video-call-answered", async ({ answer }) => {
+      console.log("Call answered, setting remote description...");
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
       setCalling(false);
       setInCall(true);
@@ -95,6 +96,7 @@ const VideoCall = () => {
     };
 
     pc.ontrack = (event) => {
+      console.log("Received remote track:", event);
       if (remoteVideoRef.current && !remoteVideoRef.current.srcObject) {
         remoteVideoRef.current.srcObject = event.streams[0];
       }
