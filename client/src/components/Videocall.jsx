@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AppContent } from "../context/AppContext";
+import { FiPhone } from "react-icons/fi";
 import styles from './VideoCall.module.css';
 
 const VideoCall = () => {
@@ -179,29 +180,34 @@ const VideoCall = () => {
   return (
     <div className={styles.videoCallContainer}>
       <div className={styles.videos}>
-        <video ref={localVideoRef} autoPlay muted className={styles.localVideo} />
         <video ref={remoteVideoRef} autoPlay className={styles.remoteVideo} />
+        <video ref={localVideoRef} autoPlay muted className={styles.localVideo} />
       </div>
 
-      <div className={styles.controls}>
-        {!inCall && !calling && (
-          <button onClick={startCall} className={`${styles.button} ${styles.callBtn}`} disabled={!isRegistered}>
-            Start Call
-          </button>
-        )}
+      {callIncoming && incomingCallFrom && (
+        <div className={styles.incomingCall}>
+          <p>📞 Incoming call from <strong>{incomingCallFrom.username}</strong></p>
+          <button onClick={declineCall} className={`${styles.button} ${styles.declineBtn}`}>Decline</button>
+          <button onClick={acceptCall} className={`${styles.button} ${styles.acceptBtn}`}>Accept</button>
+        </div>
+      )}
 
-        {callIncoming && incomingCallFrom && (
-          <div className={styles.incomingCall}>
-            <p>📞 Incoming call from <strong>{incomingCallFrom.username}</strong></p>
-            <button onClick={declineCall} className={`${styles.button} ${styles.declineBtn}`}>Decline</button>
-            <button onClick={acceptCall} className={`${styles.button} ${styles.acceptBtn}`}>Accept</button>
-          </div>
-        )}
-
-        {(inCall || calling) && (
+      {(inCall || calling) && (
+        <div className={styles.controls}>
           <button onClick={endCall} className={`${styles.button} ${styles.endCallBtn}`}>End Call</button>
-        )}
-      </div>
+        </div>
+      )}
+
+      {!inCall && !calling && (
+        <button
+          onClick={startCall}
+          className={styles.floatingButton}
+          disabled={!isRegistered}
+          title="Start Call"
+        >
+          <FiPhone size={24} />
+        </button>
+      )}
     </div>
   );
 };
