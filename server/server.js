@@ -5,6 +5,7 @@ import cors from 'cors';
 import authrouter from './Routes/authroutes.js';
 import cookieParser from 'cookie-parser';
 import userRouter from './Routes/userroute.js';
+import { handleVideoSocket } from './socket/videocallSocket.js';
 import http from 'http';
 import { Server } from 'socket.io';
 import { handleSocketConnection } from './socket/socket.js'; // Normal chat functionality
@@ -67,6 +68,12 @@ io.on('connection', (socket) => {
   socket.on('register-user', (userId) => {
     userSockets[userId] = socket.id;
     console.log(`User ${userId} is connected with socket ${socket.id}`);
+  });
+  handleVideoSocket(io, socket); // 👈 Add this inside the `connection` event
+
+  socket.on('typing', (chatRoomId, senderId, isTyping) => {
+    console.log(`User ${senderId} is ${isTyping ? 'typing...' : 'not typing'} in ${chatRoomId}`);
+    handleTyping(io, chatRoomId, senderId, isTyping);
   });
   //typing indicator in random chat
   socket.on('typing', (chatRoomId, senderId, isTyping) => {

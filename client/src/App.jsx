@@ -11,6 +11,8 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 
+import VideoCall from './components/Videocall'; // Import your VideoCall component
+
 const App = () => {
   return (
     <div>
@@ -40,6 +42,17 @@ const App = () => {
           element={
             <PrivateRoute>
               <RandomChatPage />
+            </PrivateRoute>
+          }
+        />
+       
+ 
+        {/* Video Call Route */}
+        <Route
+          path="/videoCall/:targetUserId"
+          element={
+            <PrivateRoute>
+              <VideoCall />
             </PrivateRoute>
           }
         />

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useContext } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
-import { FaAngleLeft, FaPlus, FaTrash, FaUserPlus, FaSmile, FaTimes } from "react-icons/fa";
+import { FaAngleLeft, FaPlus, FaTrash, FaUserPlus, FaSmile, FaTimes, FaVideo } from "react-icons/fa";
 import { HiDotsVertical } from "react-icons/hi";
 import { IoMdSend } from "react-icons/io";
 import Avatar from './Avatar';
@@ -8,6 +8,7 @@ import moment from 'moment';
 import { AppContent } from '../context/AppContext';
 import axios from 'axios';
 import EmojiPicker from 'emoji-picker-react';
+import { useNavigate } from 'react-router-dom';
 
 const MessagePage = () => {
   const { userId } = useParams();
@@ -15,6 +16,7 @@ const MessagePage = () => {
   const { recipient } = location.state || {}; // Get the recipient from the state
   const { socket, userdata, backendUrl } = useContext(AppContent);
   const [isTyping, setIsTyping] = useState(false);
+  const navigate = useNavigate();
 
   const [message, setMessage] = useState({ text: "", imageUrl: "" });
   const [allMessages, setAllMessages] = useState([]);
@@ -31,6 +33,11 @@ const MessagePage = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [friendStatusMessage, setFriendStatusMessage] = useState("");
   // Fetch conversation ID and load previous messages
+
+  const handleVideoCall = () => {
+    // Assuming you have a video call page or component
+    navigate(`/videoCall/${recipient._id}`);  // Example path for a video call page
+  };
   const fetchConversationId = async () => {
     if (!userId || !recipient?._id) return;
 
@@ -155,10 +162,6 @@ const MessagePage = () => {
   
     return () => clearTimeout(timeout);
   }, [allMessages]);
-  
-  
-  
-  
   
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -351,6 +354,12 @@ const typingTimeout = useRef(null)
         </div>
 
         <div className="flex gap-3">
+        <button 
+            className="text-gray-300 hover:bg-white/20 rounded-full p-2 transition"
+            onClick={handleVideoCall} // Open the video call
+          >
+            <FaVideo size={20} />
+          </button>
           {/* Add Friend Button */}
           {friendStatus !== "You are already friends." && (
   <button
