@@ -46,6 +46,7 @@ const VideoCall = () => {
 
     socket.on("video-ice-candidate", async ({ candidate }) => {
       if (candidate) {
+        console.log("Received ICE candidate", candidate); // Debug ICE candidate
         await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       }
     });
@@ -106,8 +107,14 @@ const VideoCall = () => {
 
     pc.ontrack = (event) => {
       console.log("Received remote stream:", event.streams); // Debug received stream
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+      if (event.streams && event.streams.length > 0) {
+        const remoteStream = event.streams[0];
+        console.log("Remote Stream:", remoteStream); // Debug stream details
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStream;
+        }
+      } else {
+        console.error("No streams received!");
       }
     };
 
