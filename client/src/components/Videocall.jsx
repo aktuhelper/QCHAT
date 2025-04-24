@@ -79,15 +79,19 @@ const VideoCall = () => {
       localStream.current.getTracks().forEach(track => track.stop());
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localStream.current = stream;
-    localVideoRef.current.srcObject = stream;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStream.current = stream;
+      localVideoRef.current.srcObject = stream;
 
-    stream.getTracks().forEach(track => {
-      if (peerConnection.current) {
-        peerConnection.current.addTrack(track, stream);
-      }
-    });
+      stream.getTracks().forEach(track => {
+        if (peerConnection.current) {
+          peerConnection.current.addTrack(track, stream);
+        }
+      });
+    } catch (error) {
+      console.error("Error accessing media devices:", error);
+    }
   };
 
   const createPeerConnection = () => {
@@ -110,8 +114,21 @@ const VideoCall = () => {
       if (event.streams && event.streams.length > 0) {
         const remoteStream = event.streams[0];
         console.log("Remote Stream:", remoteStream); // Debug stream details
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream;
+    
+        // Check if the remote stream contains video tracks
+        if (remoteStream.getVideoTracks().length > 0) {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play()
+              .then(() => {
+                console.log("Remote video is playing");
+              })
+              .catch((error) => {
+                console.error("Error playing remote video:", error);
+              });
+          }
+        } else {
+          console.error("No video tracks found in remote stream!");
         }
       } else {
         console.error("No streams received!");
