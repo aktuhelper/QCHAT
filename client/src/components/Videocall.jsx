@@ -21,11 +21,9 @@ const VideoCall = () => {
   useEffect(() => {
     if (!socket || !userdata?._id) return;
 
-    console.log("Registering user with ID:", userdata._id);
     socket.emit("video-register", userdata._id);
 
     socket.on("video-registered", ({ userId }) => {
-      console.log(`✅ Successfully registered user ${userId}`);
       setIsRegistered(true);
     });
 
@@ -35,7 +33,6 @@ const VideoCall = () => {
     });
 
     socket.on("video-call-answered", async ({ answer }) => {
-      console.log("Call answered, setting remote description...");
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
       setCalling(false);
       setInCall(true);
@@ -69,16 +66,26 @@ const VideoCall = () => {
       socket.off("video-ice-candidate");
       socket.off("video-call-ended");
       socket.off("video-call-error");
+      endCall(); // clean on unmount
     };
   }, [socket, userdata]);
 
   const getPeerTarget = () => calling ? targetUserId : incomingCallFrom?.from;
 
   const getMedia = async () => {
+    if (localStream.current) {
+      localStream.current.getTracks().forEach(track => track.stop());
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     localStream.current = stream;
     localVideoRef.current.srcObject = stream;
-    stream.getTracks().forEach((track) => peerConnection.current.addTrack(track, stream));
+
+    stream.getTracks().forEach(track => {
+      if (peerConnection.current) {
+        peerConnection.current.addTrack(track, stream);
+      }
+    });
   };
 
   const createPeerConnection = () => {
@@ -96,8 +103,7 @@ const VideoCall = () => {
     };
 
     pc.ontrack = (event) => {
-      console.log("Received remote track:", event);
-      if (remoteVideoRef.current && !remoteVideoRef.current.srcObject) {
+      if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
       }
     };
@@ -106,15 +112,7 @@ const VideoCall = () => {
   };
 
   const startCall = async () => {
-    if (!isRegistered) {
-      console.warn("User not registered yet. Try again shortly.");
-      return;
-    }
-
-    if (!targetUserId) {
-      alert("No target user specified.");
-      return;
-    }
+    if (!isRegistered || !targetUserId) return;
 
     peerConnection.current = createPeerConnection();
     await getMedia();
@@ -155,8 +153,17 @@ const VideoCall = () => {
   };
 
   const endCall = () => {
-    if (peerConnection.current) peerConnection.current.close();
-    if (localStream.current) localStream.current.getTracks().forEach(track => track.stop());
+    if (peerConnection.current) {
+      peerConnection.current.onicecandidate = null;
+      peerConnection.current.ontrack = null;
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+
+    if (localStream.current) {
+      localStream.current.getTracks().forEach(track => track.stop());
+      localStream.current = null;
+    }
 
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
