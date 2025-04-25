@@ -13,25 +13,34 @@ export const handleVideoSocket = (io, socket) => {
   // Handle outgoing call to another user
   socket.on("video-call-user", async ({ to, from, offer }) => {
     const targetSocketId = userSockets.get(to);
+    console.log(`Target Socket ID for user ${to}: ${targetSocketId}`); // Debug log
 
     if (targetSocketId) {
       try {
         // Fetch caller details from database
         const caller = await UserModel.findById(from).select("name profile_pic");
+        console.log("Caller details:", caller); // Debug log
 
         if (!caller) throw new Error("Caller not found");
 
-        // Emit incoming call to the target user
+        // Fetch target user details
+        const targetUser = await UserModel.findById(to).select("name profile_pic");
+        console.log("Target user details:", targetUser); // Debug log
+
+        if (!targetUser) throw new Error("Target user not found");
+
+        // Emit incoming call to the target user with caller and target details
         io.to(targetSocketId).emit("video-incoming-call", {
           from,
-          caller,  // Sending entire user object
+          caller,  // Sending entire caller object
+          targetUser,  // Sending target user details
           offer,
         });
 
       } catch (error) {
-        console.error("Error fetching caller:", error.message);
+        console.error("Error fetching caller or target user:", error.message);
         io.to(socket.id).emit("video-call-error", {
-          message: "Could not fetch caller details.",
+          message: "Could not fetch user details.",
         });
       }
     } else {

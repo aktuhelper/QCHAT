@@ -38,9 +38,38 @@
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
-.incomingCall {
+.callHeader {
   position: absolute;
   top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  z-index: 10;
+}
+
+.callHeader .profilePic {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  margin-right: 50px; /* Adjusted margin-right */
+  margin-top: 10px; /* Optional: Add top margin */
+  margin-bottom: 10px; /* Optional: Add bottom margin */
+}
+
+
+.callHeader .callingInfo {
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.incomingCall {
+  position: absolute;
+  top: 2.35rem;
   left: 50%;
   transform: translateX(-50%);
   background-color: rgba(30, 30, 30, 0.95);
@@ -134,6 +163,7 @@
   background-color: #4ade80;
   cursor: not-allowed;
 }
+
 .callerInfo {
   display: flex;
   align-items: center;
@@ -148,3 +178,22 @@
   border-radius: 50%;
   border: 2px solid #ddd;
 }
+.callingInfo {
+  display: flex;
+  flex-direction: column; /* Aligns items in a vertical column */
+  align-items: flex-end; /* Aligns the profile pic to the right */
+  justify-content: center; /* Vertically centers the content */
+  gap: 10px; /* Adds space between the profile pic and the text */
+  text-align: left; /* Align text to the left */
+}
+
+.callingInfo p {
+  margin-left: -10px; /* Shifts the text slightly to the left */
+}
+
+.profilePic {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+}
+

@@ -3,51 +3,54 @@ import { useParams } from "react-router-dom";
 import { AppContent } from "../context/AppContext";
 import { FiPhone } from "react-icons/fi";
 import styles from "./VideoCall.module.css";
+import axios from 'axios';
 
 const VideoCall = () => {
-  const { socket, userdata } = useContext(AppContent);
+  const { socket, userdata ,backendUrl} = useContext(AppContent);
   const { targetUserId } = useParams();
 
   const [callIncoming, setCallIncoming] = useState(false);
   const [calling, setCalling] = useState(false);
   const [inCall, setInCall] = useState(false);
   const [incomingCallFrom, setIncomingCallFrom] = useState(null);
+  const [targetUser, setTargetUser] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
-  const [interactionUnlocked, setInteractionUnlocked] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
   const localStream = useRef(null);
-  const ringtoneRef = useRef(null); // 🔔 ringtone ref
+  const ringtoneRef = useRef(null);
 
   useEffect(() => {
     if (!socket || !userdata?._id) return;
 
     socket.emit("video-register", userdata._id);
 
-    socket.on("video-registered", ({ userId }) => {
-      setIsRegistered(true);
-    });
+    socket.on("video-registered", () => setIsRegistered(true));
 
-    socket.on("video-incoming-call", async ({ from, caller, offer }) => {
-      setIncomingCallFrom({ from, username: caller.name, profilePic: caller.profile_pic, offer });
+    socket.on("video-incoming-call", ({ from, caller, offer }) => {
+      if (!from || !caller || !offer) return;
+
+      setIncomingCallFrom({
+        from,
+        username: caller.name,
+        profilePic: caller.profile_pic,
+        offer,
+      });
+
       setCallIncoming(true);
-  
-      // 🔊 Play ringtone
-      ringtoneRef.current?.play().catch((err) => console.warn("Ringtone play error:", err));
-  
-      // 📳 Start vibration
-      if (navigator.vibrate) {
-        navigator.vibrate([500, 300, 500, 300]);
-      }
+      ringtoneRef.current?.play().catch((err) => console.warn("Ringtone error:", err));
+      navigator.vibrate?.([500, 300, 500, 300]);
     });
 
     socket.on("video-call-answered", async ({ answer }) => {
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-      stopRingtoneAndVibration();
-      setCalling(false);
-      setInCall(true);
+      if (peerConnection.current) {
+        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+        stopRingtoneAndVibration();
+        setCalling(false);
+        setInCall(true);
+      }
     });
 
     socket.on("video-call-declined", () => {
@@ -57,7 +60,7 @@ const VideoCall = () => {
     });
 
     socket.on("video-ice-candidate", async ({ candidate }) => {
-      if (candidate) {
+      if (candidate && peerConnection.current) {
         await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       }
     });
@@ -91,12 +94,10 @@ const VideoCall = () => {
       ringtoneRef.current.pause();
       ringtoneRef.current.currentTime = 0;
     }
-    if (navigator.vibrate) {
-      navigator.vibrate(0);
-    }
+    navigator.vibrate?.(0);
   };
 
-  const getPeerTarget = () => calling ? targetUserId : incomingCallFrom?.from;
+  const getPeerTarget = () => (calling ? targetUserId : incomingCallFrom?.from);
 
   const getMedia = async () => {
     if (localStream.current) {
@@ -109,17 +110,11 @@ const VideoCall = () => {
       localVideoRef.current.srcObject = stream;
 
       stream.getTracks().forEach(track => {
-        if (peerConnection.current) {
-          peerConnection.current.addTrack(track, stream);
-        }
+        peerConnection.current?.addTrack(track, stream);
       });
     } catch (error) {
-      console.error("Error accessing media devices:", error);
-      if (error.name === "NotReadableError") {
-        alert("Camera is already in use by another application. Please close other apps using the camera.");
-      } else {
-        alert("An error occurred while trying to access your camera and microphone. Please check your device settings.");
-      }
+      alert("Error accessing media devices. Check your settings.");
+      console.error(error);
     }
   };
 
@@ -138,16 +133,9 @@ const VideoCall = () => {
     };
 
     pc.ontrack = (event) => {
-      if (event.streams && event.streams.length > 0) {
+      if (event.streams?.length > 0) {
         const remoteStream = event.streams[0];
-        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStream) {
-          remoteVideoRef.current.srcObject = remoteStream;
-          setTimeout(() => {
-            remoteVideoRef.current?.play().catch((error) => {
-              console.error("Error playing remote video:", error);
-            });
-          }, 100);
-        }
+        remoteVideoRef.current.srcObject = remoteStream;
       }
     };
 
@@ -157,13 +145,22 @@ const VideoCall = () => {
   const startCall = async () => {
     if (!isRegistered || !targetUserId) return;
 
+    try {
+      const response = await axios.get(`${backendUrl}/api/users/${targetUserId}`);
+      setTargetUser(response.data);
+      console.log("Fetched target user:", response.data);
+    } catch (err) {
+      console.error("Failed to fetch user info:", err);
+      return;
+    }
+
     peerConnection.current = createPeerConnection();
     await getMedia();
 
     const offer = await peerConnection.current.createOffer();
     await peerConnection.current.setLocalDescription(offer);
 
-    setCalling(true);
+    setCalling(true); // Only after fetching user
 
     socket.emit("video-call-user", {
       to: targetUserId,
@@ -177,12 +174,14 @@ const VideoCall = () => {
     peerConnection.current = createPeerConnection();
     await getMedia();
 
-    const offer = incomingCallFrom.offer;
+    const offer = incomingCallFrom?.offer;
+    if (!offer) return;
+
     await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peerConnection.current.createAnswer();
     await peerConnection.current.setLocalDescription(answer);
 
-    socket.emit("video-answer-call", { to: incomingCallFrom.from, answer });
+    socket.emit("video-answer-call", { to: incomingCallFrom?.from, answer });
 
     stopRingtoneAndVibration();
     setCallIncoming(false);
@@ -191,24 +190,18 @@ const VideoCall = () => {
   };
 
   const declineCall = () => {
-    socket.emit("video-decline-call", { to: incomingCallFrom.from });
+    socket.emit("video-decline-call", { to: incomingCallFrom?.from });
     stopRingtoneAndVibration();
     setCallIncoming(false);
     setIncomingCallFrom(null);
   };
 
   const endCall = () => {
-    if (peerConnection.current) {
-      peerConnection.current.onicecandidate = null;
-      peerConnection.current.ontrack = null;
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
+    peerConnection.current?.close();
+    peerConnection.current = null;
 
-    if (localStream.current) {
-      localStream.current.getTracks().forEach(track => track.stop());
-      localStream.current = null;
-    }
+    localStream.current?.getTracks().forEach(track => track.stop());
+    localStream.current = null;
 
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
@@ -221,10 +214,35 @@ const VideoCall = () => {
     setCallIncoming(false);
     setIncomingCallFrom(null);
   };
+
+  if (!userdata._id || !socket) return <div>Loading...</div>;
+
   return (
     <div className={styles.videoCallContainer}>
-      {/* 🔔 Ringtone element */}
       <audio ref={ringtoneRef} src="/sound/ringtone.mp3" loop preload="auto" />
+
+      {(callIncoming || calling || inCall) && (
+        <div className={styles.callHeader}>
+          {callIncoming && incomingCallFrom && (
+            <>
+              
+            </>
+          )}
+
+{calling && targetUser && (
+  <div className={styles.callingInfo}>
+    <img
+      src={targetUser.profile_pic || "/default-profile.png"}
+      alt="Target User"
+      className={styles.profilePic}
+      onError={(e) => { e.target.src = "/default-profile.png"; }}
+    />
+    <p>📞 Calling to {targetUser.name || "Target User"}</p>
+  </div>
+)}
+         
+        </div>
+      )}
 
       <div className={styles.videos}>
         <video ref={remoteVideoRef} autoPlay className={styles.remoteVideo} />
@@ -238,9 +256,7 @@ const VideoCall = () => {
               src={incomingCallFrom.profilePic || "/default-profile.png"}
               alt="Caller"
               className={styles.callerImage}
-              onError={(e) => {
-                e.target.src = "/default-profile.png";
-              }}
+              onError={(e) => { e.target.src = "/default-profile.png"; }}
             />
             <p>📞 Incoming call from <strong>{incomingCallFrom.username}</strong></p>
           </div>

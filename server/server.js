@@ -23,6 +23,7 @@ import friendRequestRoute from './Routes/friendroute.js';
 import acceptorreject from './Routes/acceptorreject.js';
 import rou from './Routes/checkFriend.js';
 import path from 'path';
+import target from './Routes/targetuser.js';
 dotenv.config();
 
 const app = express();
@@ -43,7 +44,7 @@ app.use('/api/conv', router);
 app.use('/api/friend-requests', friendRequestRoute);
 app.use("/api/friends", acceptorreject);
 app.use("/api/user", rou);
-
+app.use('/api/users', target);
 // Health Check
 
 // HTTP + WebSocket server setup
