@@ -44,6 +44,7 @@
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   color: white;
@@ -51,22 +52,27 @@
   z-index: 10;
 }
 
-.callHeader .profilePic {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  margin-right: 50px; /* Adjusted margin-right */
-  margin-top: 10px; /* Optional: Add top margin */
-  margin-bottom: 10px; /* Optional: Add bottom margin */
-}
-
-
-.callHeader .callingInfo {
-  font-size: 18px;
-  font-weight: bold;
+/* Updated callingInfo styles to center image and text */
+.callingInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center horizontally */
+  justify-content: center; /* Center vertically */
+  gap: 10px;
   text-align: center;
 }
 
+.callingInfo p {
+  margin: 0; /* Reset any margin */
+}
+
+.profilePic {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+}
+
+/* Incoming call notification styles */
 .incomingCall {
   position: absolute;
   top: 2.35rem;
@@ -178,22 +184,3 @@
   border-radius: 50%;
   border: 2px solid #ddd;
 }
-.callingInfo {
-  display: flex;
-  flex-direction: column; /* Aligns items in a vertical column */
-  align-items: flex-end; /* Aligns the profile pic to the right */
-  justify-content: center; /* Vertically centers the content */
-  gap: 10px; /* Adds space between the profile pic and the text */
-  text-align: left; /* Align text to the left */
-}
-
-.callingInfo p {
-  margin-left: -10px; /* Shifts the text slightly to the left */
-}
-
-.profilePic {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-}
-
