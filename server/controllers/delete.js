@@ -32,11 +32,18 @@ const deleteConversation = async (req, res) => {
         await MessageModel.deleteMany({ _id: { $in: conversation.messages } });
 
         // Delete the conversation itself using deleteOne
-        await ConversationModel.deleteOne({ _id: conversationId });
+        await conversation.deleteOne();  // Using deleteOne on the found conversation directly
 
+        // Log success only if deletion is successful
+        console.log('Conversation deleted successfully:', conversationId);
+
+        // Send success response
         return res.status(200).json({ message: "Conversation deleted successfully." });
     } catch (error) {
+        // Only log error if there is an actual failure in the process
         console.error('Error deleting conversation:', error);
+
+        // Return a generic server error message
         return res.status(500).json({ message: "Server error while deleting conversation." });
     }
 };
