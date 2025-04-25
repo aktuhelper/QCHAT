@@ -32,8 +32,6 @@ const MessagePage = () => {
   const [friendStatus, setFriendStatus] = useState(""); // Track if users are already friends
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [friendStatusMessage, setFriendStatusMessage] = useState("");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
   // Fetch conversation ID and load previous messages
 
   const handleVideoCall = () => {
@@ -59,10 +57,6 @@ const MessagePage = () => {
   }, []);
   useEffect(() => {
     const rawMessages = localStorage.getItem('allMessages');
-    if (!conversationId || !rawMessages) {
-      setAllMessages([]);
-      return;
-    }
     try {
       const parsedMessages = JSON.parse(rawMessages);
       if (Array.isArray(parsedMessages)) {
@@ -95,8 +89,8 @@ const MessagePage = () => {
         setAllMessages([]);
       }
     };
-
     
+   
     
 
     const handleReceiveMessage = (newMessage) => {
@@ -168,11 +162,7 @@ const MessagePage = () => {
   
     return () => clearTimeout(timeout);
   }, [allMessages]);
-  useEffect(() => {
-    if (userdata?._id && userId) {
-      handleCheckFriendStatus();
-    }
-  }, [userdata?._id, userId]);
+  
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!message.text.trim() && !message.imageUrl) return; // Prevent sending if the message is empty or just whitespace
@@ -221,38 +211,35 @@ const MessagePage = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleCancelImagePreview = () => {
+    setPreviewImage(""); // Clear the preview image
+    setMessage((prev) => ({ ...prev, imageUrl: "" })); // Clear imageUrl from message state
+  };
+
   const handleDeleteConversation = async () => {
-    setAllMessages([]);
+    if (!conversationId) return;
+
     try {
       const response = await axios.delete(`${backendUrl}/api/auth/deleteConversation/${conversationId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${userdata.token}`,
         },
       });
-  
+
       if (response.data.success) {
-        // Successfully deleted the conversation
-        setAllMessages([]);  // Clear the messages in the state
-        setMessage({ text: "", imageUrl: "" });  // Clear the message input
-        setPreviewImage("");  // Clear the image preview
-        localStorage.removeItem('allMessages');  // Optionally clear saved messages in localStorage
-        
-        // You can use forceUpdate() here if the page doesn't re-render properly
-        setMessage([]);  // This will ensure the state is cleared immediately
-        alert(response.data.message || 'Conversation deleted successfully');
+        alert('Conversation deleted successfully.');
+        setAllMessages([]); // Clear the messages after deleting the conversation
+        setConversationId(null); // Clear conversation ID
+        localStorage.removeItem('allMessages'); // Remove messages from localStorage
       } else {
-        console.error('Error deleting conversation:', response.data.message);
-        alert(response.data.message || 'An error occurred while deleting the conversation.');
+        alert('An error occurred while deleting the conversation.');
       }
     } catch (error) {
       console.error('Error deleting conversation:', error);
       alert('An error occurred while deleting the conversation.');
     }
   };
-  
-  
-  
-  
+
   const handleSendFriendRequest = async () => {
     if (!userdata?._id) return;
   
@@ -367,15 +354,12 @@ const typingTimeout = useRef(null)
         </div>
 
         <div className="flex gap-3">
-        {friendStatus === "You are already friends." && (
-  <button 
-    className="text-gray-300 hover:bg-white/20 rounded-full p-2 transition"
-    onClick={handleVideoCall}
-  >
-    <FaVideo size={20} />
-  </button>
-)}
-
+        <button 
+            className="text-gray-300 hover:bg-white/20 rounded-full p-2 transition"
+            onClick={handleVideoCall} // Open the video call
+          >
+            <FaVideo size={20} />
+          </button>
           {/* Add Friend Button */}
           {friendStatus !== "You are already friends." && (
   <button
@@ -391,13 +375,9 @@ const typingTimeout = useRef(null)
 
 
           {/* Delete Button */}
-          <button
-  className="text-gray-300 hover:bg-white/20 rounded-full p-2 transition"
-  onClick={() => setShowDeleteConfirm(true)}
->
-  <FaTrash size={20} />
-</button>
-
+          <button className="text-gray-300 hover:bg-white/20 rounded-full p-2 transition" onClick={handleDeleteConversation}>
+            <FaTrash size={20} />
+          </button>
 
           <button className="text-gray-300 hover:text-gray-100 transition">
             <HiDotsVertical size={22} />
@@ -573,35 +553,6 @@ const typingTimeout = useRef(null)
     </div>
   </div>
 )}
-{showDeleteConfirm && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-    <div className="bg-[#1A1A1A] w-[90%] max-w-md p-6 rounded-lg shadow-lg text-center mx-4">
-      <h2 className="text-xl font-semibold mb-4 text-white">Delete Conversation?</h2>
-      <p className="text-gray-300 mb-6">
-        Are you sure you want to delete this conversation? This action cannot be undone.
-      </p>
-
-      <div className="flex justify-center gap-4 flex-wrap">
-        <button
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md min-w-[100px]"
-          onClick={async () => {
-            await handleDeleteConversation();
-            setShowDeleteConfirm(false);
-          }}
-        >
-          Delete
-        </button>
-        <button
-          className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md min-w-[100px]"
-          onClick={() => setShowDeleteConfirm(false)}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
 
     </div>
   );
