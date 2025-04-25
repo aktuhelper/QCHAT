@@ -3,148 +3,134 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: #333;
   height: 100vh;
-  color: white;
+  background-color: #000;
   position: relative;
-  padding: 10px;
+  padding: 1rem;
+  color: white;
 }
 
 .videos {
-  display: flex;
-  justify-content: center;
-  align-items: center;
   position: relative;
   width: 100%;
   height: 100%;
-}
-
-.localVideo {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  width: 180px;
-  height: 135px;
-  border-radius: 10px;
-  border: 3px solid #fff;
-  background: black;
+  max-width: 96rem;
 }
 
 .remoteVideo {
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  border-radius: 10px;
-  border: 3px solid #fff;
-  background: black;
+  border-radius: 1rem;
+  object-fit: cover;
+  background-color: #111;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
 }
 
-.controls {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+.localVideo {
   position: absolute;
-  bottom: 20px;
-  width: 100%;
-}
-
-.button {
-  padding: 10px 20px;
-  font-size: 16px;
-  border: none;
-  border-radius: 20px;
-  cursor: pointer;
-  margin: 5px;
-}
-
-.callBtn {
-  background-color: #25d366;
-  color: white;
-}
-
-.declineBtn {
-  background-color: red;
-  color: white;
-}
-
-.acceptBtn {
-  background-color: #128c7e;
-  color: white;
-}
-
-.endCallBtn {
-  background-color: red;
-  color: white;
-  font-size: 18px;
-  width: 100%;
-  max-width: 300px;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  width: 10rem;
+  height: 8rem;
+  border-radius: 0.75rem;
+  object-fit: cover;
+  background-color: #000;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
 .incomingCall {
-  text-align: center;
   position: absolute;
-  top: 20px;  /* Position it at the top */
-  width: 100%;
-  z-index: 10;  /* Ensure it's above other elements */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-}
-
-.floatingButton {
-  position: fixed;
-  bottom: 20px;
+  top: 1.25rem;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #25d366;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  padding: 15px;
+  background-color: rgba(30, 30, 30, 0.95);
+  padding: 1rem 2rem;
+  border-radius: 1rem;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.button {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  transition: background-color 0.3s ease-in-out;
+  transition: background 0.3s ease;
+  border: none;
 }
 
-.floatingButton:hover {
-  background-color: #128c7e;
+.acceptBtn {
+  background-color: #22c55e;
+  color: white;
 }
 
-@media (max-width: 768px) {
-  .localVideo {
-    width: 150px;
-    height: 120px;
-  }
-
-  .remoteVideo {
-    width: 100%;
-    height: 60%;
-  }
-
-  .controls {
-    bottom: 10px;
-  }
-
-  .incomingCall {
-    top: 10px;  /* Adjust for smaller screens */
-  }
+.acceptBtn:hover {
+  background-color: #16a34a;
 }
 
-@media (max-width: 480px) {
-  .localVideo {
-    width: 120px;
-    height: 100px;
-  }
+.declineBtn {
+  background-color: #ef4444;
+  color: white;
+}
 
-  .remoteVideo {
-    width: 100%;
-    height: 50%;
-  }
+.declineBtn:hover {
+  background-color: #dc2626;
+}
 
-  .endCallBtn {
-    width: 100%;
-    max-width: 260px;
-  }
+.endCallContainer {
+  position: absolute;
+  bottom: 1.25rem;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  z-index: 20;
+}
+
+.endCallButton {
+  padding: 0.75rem 1.5rem;
+  background-color: #dc2626;
+  color: white;
+  font-size: 1.125rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.endCallButton:hover {
+  background-color: #b91c1c;
+}
+
+.startCallButton {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #22c55e;
+  color: white;
+  padding: 1rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  z-index: 20;
+}
+
+.startCallButton:hover {
+  background-color: #16a34a;
+}
+
+.startCallButton:disabled {
+  background-color: #4ade80;
+  cursor: not-allowed;
 }

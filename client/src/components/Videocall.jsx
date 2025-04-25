@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AppContent } from "../context/AppContext";
 import { FiPhone } from "react-icons/fi";
-import styles from './VideoCall.module.css';
+import styles from "./VideoCall.module.css";
 
 const VideoCall = () => {
   const { socket, userdata } = useContext(AppContent);
@@ -78,12 +78,12 @@ const VideoCall = () => {
     if (localStream.current) {
       localStream.current.getTracks().forEach(track => track.stop());
     }
-
+  
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStream.current = stream;
       localVideoRef.current.srcObject = stream;
-
+  
       stream.getTracks().forEach(track => {
         if (peerConnection.current) {
           peerConnection.current.addTrack(track, stream);
@@ -91,45 +91,44 @@ const VideoCall = () => {
       });
     } catch (error) {
       console.error("Error accessing media devices:", error);
+      if (error.name === "NotReadableError") {
+        alert("Camera is already in use by another application. Please close other apps using the camera.");
+      } else {
+        alert("An error occurred while trying to access your camera and microphone. Please check your device settings.");
+      }
     }
   };
+  
 
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }], 
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
-
+  
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("Sending ICE candidate", event.candidate); // Debug ICE candidate
+        console.log("Sending ICE candidate", event.candidate);
         socket.emit("video-ice-candidate", {
           to: getPeerTarget(),
           candidate: event.candidate,
         });
       }
     };
-
+  
     pc.ontrack = (event) => {
-      console.log("Received remote stream:", event.streams); // Debug received stream
+      console.log("Received remote stream:", event.streams);
       if (event.streams && event.streams.length > 0) {
         const remoteStream = event.streams[0];
-        console.log("Remote Stream:", remoteStream); // Debug stream details
-    
-        // Check if the remote stream contains video tracks
+        console.log("Remote Stream:", remoteStream);
+  
         if (remoteStream.getVideoTracks().length > 0) {
           if (remoteVideoRef.current) {
-            // Set the remote stream before calling play()
             remoteVideoRef.current.srcObject = remoteStream;
-
-            // Check if video is paused, only then call play()
+            
             if (remoteVideoRef.current.paused) {
-              remoteVideoRef.current.play()
-                .then(() => {
-                  console.log("Remote video is playing");
-                })
-                .catch((error) => {
-                  console.error("Error playing remote video:", error);
-                });
+              remoteVideoRef.current.play().catch((error) => {
+                console.error("Error playing remote video:", error);
+              });
             }
           }
         } else {
@@ -139,9 +138,10 @@ const VideoCall = () => {
         console.error("No streams received!");
       }
     };
-
+  
     return pc;
   };
+  
 
   const startCall = async () => {
     if (!isRegistered || !targetUserId) return;
@@ -219,21 +219,23 @@ const VideoCall = () => {
       {callIncoming && incomingCallFrom && (
         <div className={styles.incomingCall}>
           <p>📞 Incoming call from <strong>{incomingCallFrom.username}</strong></p>
-          <button onClick={declineCall} className={`${styles.button} ${styles.declineBtn}`}>Decline</button>
-          <button onClick={acceptCall} className={`${styles.button} ${styles.acceptBtn}`}>Accept</button>
+          <div className={styles.buttonGroup}>
+            <button onClick={declineCall} className={`${styles.button} ${styles.declineBtn}`}>Decline</button>
+            <button onClick={acceptCall} className={`${styles.button} ${styles.acceptBtn}`}>Accept</button>
+          </div>
         </div>
       )}
 
       {(inCall || calling) && (
-        <div className={styles.controls}>
-          <button onClick={endCall} className={`${styles.button} ${styles.endCallBtn}`}>End Call</button>
+        <div className={styles.endCallContainer}>
+          <button onClick={endCall} className={styles.endCallButton}>End Call</button>
         </div>
       )}
 
       {!inCall && !calling && (
         <button
           onClick={startCall}
-          className={styles.floatingButton}
+          className={styles.startCallButton}
           disabled={!isRegistered}
           title="Start Call"
         >
