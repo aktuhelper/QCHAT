@@ -13,11 +13,13 @@ const VideoCall = () => {
   const [inCall, setInCall] = useState(false);
   const [incomingCallFrom, setIncomingCallFrom] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [interactionUnlocked, setInteractionUnlocked] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
   const localStream = useRef(null);
+  const ringtoneRef = useRef(null); // 🔔 ringtone ref
 
   useEffect(() => {
     if (!socket || !userdata?._id) return;
@@ -28,35 +30,46 @@ const VideoCall = () => {
       setIsRegistered(true);
     });
 
-    socket.on("video-incoming-call", async ({ from, username, offer }) => {
-      setIncomingCallFrom({ from, username, offer });
+    socket.on("video-incoming-call", async ({ from, caller, offer }) => {
+      setIncomingCallFrom({ from, username: caller.name, profilePic: caller.profile_pic, offer });
       setCallIncoming(true);
+  
+      // 🔊 Play ringtone
+      ringtoneRef.current?.play().catch((err) => console.warn("Ringtone play error:", err));
+  
+      // 📳 Start vibration
+      if (navigator.vibrate) {
+        navigator.vibrate([500, 300, 500, 300]);
+      }
     });
 
     socket.on("video-call-answered", async ({ answer }) => {
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+      stopRingtoneAndVibration();
       setCalling(false);
       setInCall(true);
     });
 
     socket.on("video-call-declined", () => {
       alert("Call was declined.");
+      stopRingtoneAndVibration();
       setCalling(false);
     });
 
     socket.on("video-ice-candidate", async ({ candidate }) => {
       if (candidate) {
-        console.log("Received ICE candidate", candidate); // Debug ICE candidate
         await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
       }
     });
 
     socket.on("video-call-ended", () => {
+      stopRingtoneAndVibration();
       endCall();
     });
 
     socket.on("video-call-error", ({ message }) => {
       alert(message);
+      stopRingtoneAndVibration();
       setCalling(false);
     });
 
@@ -68,9 +81,20 @@ const VideoCall = () => {
       socket.off("video-ice-candidate");
       socket.off("video-call-ended");
       socket.off("video-call-error");
-      endCall(); // clean on unmount
+      stopRingtoneAndVibration();
+      endCall();
     };
   }, [socket, userdata]);
+
+  const stopRingtoneAndVibration = () => {
+    if (ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current.currentTime = 0;
+    }
+    if (navigator.vibrate) {
+      navigator.vibrate(0);
+    }
+  };
 
   const getPeerTarget = () => calling ? targetUserId : incomingCallFrom?.from;
 
@@ -78,12 +102,12 @@ const VideoCall = () => {
     if (localStream.current) {
       localStream.current.getTracks().forEach(track => track.stop());
     }
-  
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStream.current = stream;
       localVideoRef.current.srcObject = stream;
-  
+
       stream.getTracks().forEach(track => {
         if (peerConnection.current) {
           peerConnection.current.addTrack(track, stream);
@@ -98,60 +122,37 @@ const VideoCall = () => {
       }
     }
   };
-  
 
-  
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
-  
+
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("Sending ICE candidate", event.candidate);
         socket.emit("video-ice-candidate", {
           to: getPeerTarget(),
           candidate: event.candidate,
         });
       }
     };
-  
+
     pc.ontrack = (event) => {
-      console.log("Received remote stream:", event.streams);
       if (event.streams && event.streams.length > 0) {
         const remoteStream = event.streams[0];
-        console.log("Remote Stream:", remoteStream);
-  
-        if (remoteStream.getVideoTracks().length > 0 && remoteVideoRef.current) {
-          if (remoteVideoRef.current.srcObject !== remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-  
-            // Delay the play call to avoid AbortError
-            setTimeout(() => {
-              if (remoteVideoRef.current.paused) {
-                remoteVideoRef.current
-                  .play()
-                  .then(() => {
-                    console.log("Remote video is playing");
-                  })
-                  .catch((error) => {
-                    console.error("Error playing remote video:", error);
-                  });
-              }
-            }, 100);
-          }
-        } else {
-          console.error("No video tracks found in remote stream!");
+        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStream) {
+          remoteVideoRef.current.srcObject = remoteStream;
+          setTimeout(() => {
+            remoteVideoRef.current?.play().catch((error) => {
+              console.error("Error playing remote video:", error);
+            });
+          }, 100);
         }
-      } else {
-        console.error("No streams received!");
       }
     };
-  
+
     return pc;
   };
-  
-  
 
   const startCall = async () => {
     if (!isRegistered || !targetUserId) return;
@@ -177,13 +178,13 @@ const VideoCall = () => {
     await getMedia();
 
     const offer = incomingCallFrom.offer;
-    console.log("Offer received:", offer); // Debug offer
     await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peerConnection.current.createAnswer();
     await peerConnection.current.setLocalDescription(answer);
 
     socket.emit("video-answer-call", { to: incomingCallFrom.from, answer });
 
+    stopRingtoneAndVibration();
     setCallIncoming(false);
     setInCall(true);
     setIncomingCallFrom(null);
@@ -191,6 +192,7 @@ const VideoCall = () => {
 
   const declineCall = () => {
     socket.emit("video-decline-call", { to: incomingCallFrom.from });
+    stopRingtoneAndVibration();
     setCallIncoming(false);
     setIncomingCallFrom(null);
   };
@@ -213,14 +215,17 @@ const VideoCall = () => {
 
     socket.emit("video-end-call", { to: getPeerTarget() });
 
+    stopRingtoneAndVibration();
     setInCall(false);
     setCalling(false);
     setCallIncoming(false);
     setIncomingCallFrom(null);
   };
-
   return (
     <div className={styles.videoCallContainer}>
+      {/* 🔔 Ringtone element */}
+      <audio ref={ringtoneRef} src="/sound/ringtone.mp3" loop preload="auto" />
+
       <div className={styles.videos}>
         <video ref={remoteVideoRef} autoPlay className={styles.remoteVideo} />
         <video ref={localVideoRef} autoPlay muted className={styles.localVideo} />
@@ -228,7 +233,17 @@ const VideoCall = () => {
 
       {callIncoming && incomingCallFrom && (
         <div className={styles.incomingCall}>
-          <p>📞 Incoming call from <strong>{incomingCallFrom.username}</strong></p>
+          <div className={styles.callerInfo}>
+            <img
+              src={incomingCallFrom.profilePic || "/default-profile.png"}
+              alt="Caller"
+              className={styles.callerImage}
+              onError={(e) => {
+                e.target.src = "/default-profile.png";
+              }}
+            />
+            <p>📞 Incoming call from <strong>{incomingCallFrom.username}</strong></p>
+          </div>
           <div className={styles.buttonGroup}>
             <button onClick={declineCall} className={`${styles.button} ${styles.declineBtn}`}>Decline</button>
             <button onClick={acceptCall} className={`${styles.button} ${styles.acceptBtn}`}>Accept</button>
