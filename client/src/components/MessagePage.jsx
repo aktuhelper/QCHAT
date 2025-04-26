@@ -56,43 +56,35 @@ const MessagePage = () => {
     scrollToBottom();
   }, []);
   useEffect(() => {
-    const rawMessages = localStorage.getItem('allMessages');
+    // Retrieve messages from localStorage
     try {
-      const parsedMessages = JSON.parse(rawMessages);
-      if (Array.isArray(parsedMessages)) {
-        setAllMessages(parsedMessages);
-      } else {
-        setAllMessages([]);
-      }
+      const messages = JSON.parse(localStorage.getItem('allMessages') || '[]');
+      setAllMessages(Array.isArray(messages) ? messages : []);
     } catch (error) {
       console.error('Error parsing messages from localStorage:', error);
       setAllMessages([]);
     }
-
+  
     if (!socket || !userId || !recipient?._id) return;
-
+  
     socket.emit('message-page', userId);
-
-    const handleMessageUser = (data) => {
-      setRecipientStatus(data.online ? "Online" : "Offline");
-    };
+  
+    // Define socket event handlers
+    const handleMessageUser = (data) => setRecipientStatus(data.online ? 'Online' : 'Offline');
+    
     const handleMessage = (data) => {
       if (Array.isArray(data?.messages)) {
         setAllMessages(data.messages);
       } else if (Array.isArray(data)) {
         setAllMessages(data);
       } else if (data?.message) {
-        // It's a single message, so append it
         setAllMessages((prev) => [...prev, data.message]);
       } else {
-        console.warn("Invalid messages from server:", data);
+        console.warn('Invalid messages from server:', data);
         setAllMessages([]);
       }
     };
-    
-   
-    
-
+  
     const handleReceiveMessage = (newMessage) => {
       if (
         (newMessage.receiverId === userId && newMessage.senderId === recipient?._id) ||
@@ -100,7 +92,7 @@ const MessagePage = () => {
       ) {
         setAllMessages((prev) => {
           if (!Array.isArray(prev)) return [newMessage];
-          if (!prev.some(msg => msg._id === newMessage._id)) {
+          if (!prev.some((msg) => msg._id === newMessage._id)) {
             return [...prev, newMessage];
           }
           return prev;
@@ -108,11 +100,11 @@ const MessagePage = () => {
         fetchConversationId();
       }
     };
-
+  
     const handleOnlineUsers = (onlineUsers) => {
-      setRecipientStatus(onlineUsers.includes(recipient?._id) ? "Online" : "Offline");
+      setRecipientStatus(onlineUsers.includes(recipient?._id) ? 'Online' : 'Offline');
     };
-
+  
     const handleFriendRequestResponse = (data) => {
       if (data.status === 'sent' || data.status === 'accepted') {
         setFriendRequestSent(true);
@@ -122,18 +114,19 @@ const MessagePage = () => {
         setErrorMessage(data.error);
       }
     };
-
+  
     const handleTyping = (data) => {
       if (data.senderId === recipient?._id) {
         setIsTyping(true);
         if (isUserNearBottom()) scrollToBottom();
       }
     };
-
+  
     const handleStopTyping = (data) => {
       if (data.senderId === recipient?._id) setIsTyping(false);
     };
-
+  
+    // Register socket events
     socket.on('message-user', handleMessageUser);
     socket.on('message', handleMessage);
     socket.on('receive-message', handleReceiveMessage);
@@ -141,7 +134,8 @@ const MessagePage = () => {
     socket.on('friendRequestResponse', handleFriendRequestResponse);
     socket.on('typing', handleTyping);
     socket.on('stop-typing', handleStopTyping);
-
+  
+    // Cleanup on component unmount
     return () => {
       socket.off('message-user', handleMessageUser);
       socket.off('message', handleMessage);
@@ -151,8 +145,8 @@ const MessagePage = () => {
       socket.off('typing', handleTyping);
       socket.off('stop-typing', handleStopTyping);
     };
-  }, [socket, userId, recipient?._id]);// Ensure only necessary dependencies are included
- 
+  }, [socket, userId, recipient?._id]); // Ensure only necessary dependencies are included
+  
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (currentMessage.current) {
@@ -241,22 +235,29 @@ const MessagePage = () => {
   };
 
   const handleSendFriendRequest = async () => {
-    if (!userdata?._id) return;
-  
-    if (friendStatus === "You are already friends.") {
-      // If they are already friends, show the message in the dialog
-      setShowFriendDialog(true);
-      return;
-    }
-    if (isCheckingFriendStatus) return;
-
+    if (!userdata?._id || friendStatus === "You are already friends." || isCheckingFriendStatus) return;
     setIsCheckingFriendStatus(true);
-    await handleCheckFriendStatus();
-
-    setIsCheckingFriendStatus(false);
-    socket.emit('send-friend-request', userdata._id, userId);
-    setFriendRequestSent(true); // Optimistic update
+  
+    try {
+      const { data } = await axios.get(
+        `${backendUrl}/api/user/${userdata._id}/friend-status/${userId}`,
+        { headers: { Authorization: `Bearer ${userdata.token}` } }
+      );
+  
+      if (data.isAlreadyFriends) {
+        setFriendStatus("You are already friends.");
+        setFriendStatusMessage("You are already friends.");
+      } else {
+        socket.emit('send-friend-request', userdata._id, userId);
+        setFriendRequestSent(true);
+      }
+    } catch (err) {
+      setFriendStatusMessage("Error checking friend status. Please try again.");
+    } finally {
+      setIsCheckingFriendStatus(false);
+    }
   };
+  
 
   
   const handleCloseDialog = () => {
@@ -264,23 +265,22 @@ const MessagePage = () => {
     setFriendRequestSent(false);
     setErrorMessage(""); // Clear the error message when closing the dialog
   };
-const typingTimeout = useRef(null)
+  const typingTimeout = useRef(null);
+
   const handleInputChange = (e) => {
-    const newText = e.target.value;
-    setMessage({ ...message, text: newText });
+    const text = e.target.value;
+    setMessage((prev) => ({ ...prev, text }));
   
     if (!socket || !userdata?._id || !userId) return;
-  
-    // Emit "typing"
+    
     socket.emit("typing", { senderId: userdata._id, receiverId: userId });
   
-    // Clear and reset stop-typing timeout
-   clearTimeout(typingTimeout.current);
-  typingTimeout.current = setTimeout(() => {
-    socket.emit("stop-typing", { senderId: userdata._id, receiverId: userId });
-  }, 1500);// Adjust the delay (ms) as needed
+    clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => {
+      socket.emit("stop-typing", { senderId: userdata._id, receiverId: userId });
+    }, 1500);
   };
-
+  
 
   const handleCheckFriendStatus = async () => {
     if (!userdata || !userdata._id) {
@@ -325,7 +325,7 @@ const typingTimeout = useRef(null)
   
     return height - position < threshold;
   };
-  
+
   return (
     <div className="h-screen flex flex-col text-white bg-[url('../assets/bg.jpg')] bg-cover bg-center bg-no-repeat relative">
       {/* Header */}
