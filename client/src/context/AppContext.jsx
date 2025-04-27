@@ -1,9 +1,7 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useRef } from "react"; // <-- Correct placement of useRef
 import axios from "axios";
 import { toast } from "react-toastify";
 import { io } from "socket.io-client";
-import { useRef } from "react"; // <-- Missing
-
 
 // Function to base64 URL decode
 const base64UrlDecode = (base64Url) => {
@@ -165,7 +163,8 @@ export const AppContextProvider = (props) => {
       toast.error("Google login failed.");
     }
   };
-//videocalling
+
+// Video Calling States
   const [callIncoming, setCallIncoming] = useState(false);
   const [calling, setCalling] = useState(false);
   const [inCall, setInCall] = useState(false);
@@ -293,7 +292,6 @@ export const AppContextProvider = (props) => {
     pc.ontrack = (event) => {
       if (event.streams?.length > 0) {
         const remoteStream = event.streams[0];
-    
         const assignStream = () => {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
@@ -301,11 +299,9 @@ export const AppContextProvider = (props) => {
             setTimeout(assignStream, 100); // Retry after short delay
           }
         };
-    
         assignStream(); // Try to assign stream
       }
     };
-    
 
     return pc;
   };
@@ -339,23 +335,34 @@ export const AppContextProvider = (props) => {
   };
 
   const acceptCall = async () => {
-    peerConnection.current = createPeerConnection();
-    await getMedia();
-
-    const offer = incomingCallFrom?.offer;
-    if (!offer) return;
-
-    await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await peerConnection.current.createAnswer();
-    await peerConnection.current.setLocalDescription(answer);
-
-    socket.emit("video-answer-call", { to: incomingCallFrom?.from, answer });
-
-    stopRingtoneAndVibration();
-    setCallIncoming(false);
-    setInCall(true);
-    setIncomingCallFrom(null);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Media devices are not supported by your browser.");
+      return;
+    }
+  
+    try {
+      peerConnection.current = createPeerConnection();
+      await getMedia();  // Ensure this is called on the same page
+  
+      const offer = incomingCallFrom?.offer;
+      if (!offer) return;
+  
+      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await peerConnection.current.createAnswer();
+      await peerConnection.current.setLocalDescription(answer);
+  
+      socket.emit("video-answer-call", { to: incomingCallFrom?.from, answer });
+  
+      stopRingtoneAndVibration();
+      setCallIncoming(false);
+      setInCall(true);
+      setIncomingCallFrom(null);
+    } catch (err) {
+      console.error("Error accepting the call:", err);
+      alert("Error accessing media devices. Check your settings.");
+    }
   };
+  
 
   const declineCall = () => {
     socket.emit("video-decline-call", { to: incomingCallFrom?.from });

@@ -14,6 +14,7 @@ const IncomingCallPopup = () => {
 
   const navigate = useNavigate();
 
+
   const handleAccept = async () => {
     await acceptCall(); // 👈 This calls the logic defined in AppContext
     navigate(`/videoCall/${incomingCallFrom?.from}`); // 👈 Optional: navigate after setting up

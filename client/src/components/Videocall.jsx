@@ -1,11 +1,12 @@
 import React, { useContext, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { AppContent } from "../context/AppContext";
 import { FiPhone } from "react-icons/fi";
 import styles from "./VideoCall.module.css";
 
 const VideoCall = () => {
   const { targetUserId: paramId } = useParams();
+  const navigate = useNavigate();
 
   const {
     socket,
@@ -17,7 +18,7 @@ const VideoCall = () => {
     targetUser,
     localVideoRef,
     remoteVideoRef,
-    remoteStream, // 👈 get remote stream from context
+    remoteStream,
     ringtoneRef,
     startCall,
     acceptCall,
@@ -32,7 +33,6 @@ const VideoCall = () => {
     }
   }, [paramId, setTargetUserId]);
 
-  // 👇 Reapply remoteStream if available after mount
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -40,11 +40,12 @@ const VideoCall = () => {
   }, [remoteStream, remoteVideoRef]);
 
   if (!userdata._id || !socket) return <div>Loading...</div>;
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream]);
+
+  const handleEndCall = () => {
+    endCall();
+    navigate(-1); // Navigate back to the previous page after ending the call
+  };
+
   return (
     <div className={styles.videoCallContainer}>
       {(callIncoming || calling || inCall) && (
@@ -72,7 +73,7 @@ const VideoCall = () => {
 
       {(inCall || calling) && (
         <div className={styles.endCallContainer}>
-          <button onClick={endCall} className={styles.endCallButton}>
+          <button onClick={handleEndCall} className={styles.endCallButton}>
             End Call
           </button>
         </div>

@@ -26,9 +26,7 @@ const Sidebar = () => {
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loadingConversations, setLoadingConversations] = useState(true);
-// Video call state
-const [videoCallIncoming, setVideoCallIncoming] = useState(false);
-const [videoCallerInfo, setVideoCallerInfo] = useState(null);
+
 
   const fetchFriendRequests = useCallback(async () => {
     try {
@@ -68,53 +66,45 @@ const [videoCallerInfo, setVideoCallerInfo] = useState(null);
     if (savedFriendRequests) setFriendRequests(savedFriendRequests);
     if (savedFriends) setFriends(savedFriends);
   }, []);
+ 
+
 
   useEffect(() => {
-    if (!socket || !userdata?._id) return;
+    if (!userdata?._id) return; // Don't run if user ID is not available
   
-    // Register the user to the socket server
-    socket.emit("register-user", userdata._id);
-    console.log("Registering socket for user:", userdata._id);
+    console.log("Checking localStorage for conversations...");
+    const storedConversations = JSON.parse(localStorage.getItem('conversations'));
+    if (storedConversations) {
+      console.log("Found conversations in localStorage:", storedConversations);
+      setConversations(storedConversations); // Use localStorage data if available
+      setLoadingConversations(false); // If conversations are found, stop loading spinner
+    } else {
+      console.log("No conversations found in localStorage, fetching from server...");
+      setLoadingConversations(true); // Show the loading spinner while fetching
+      socket.emit("fetchConversations"); // Request conversations from server
+    }
   
-    // Show loading before fetching conversations
-    setLoadingConversations(true);
-    socket.emit("fetchConversations");
-  
-    // Handle the conversations
+    // Listen for server response (socket event 'conversation')
     socket.on("conversation", (convos) => {
-      setConversations(convos.length === 0 ? [] : convos);
-      setLoadingConversations(false); // Done loading
-    });
-  
-    // Handle incoming messages
-    socket.on("message", ({ senderId, receiverId, message }) => {
-      if (receiverId === userdata._id) {
-        setUnreadCounts((prev) => ({
-          ...prev,
-          [senderId]: (prev[senderId] || 0) + 1,
-        }));
+      console.log("Received conversations from server:", convos); // Log the conversations received from server
+      if (convos && convos.length > 0) {
+        setConversations(convos);
+        localStorage.setItem('conversations', JSON.stringify(convos)); // Persist to localStorage
+      } else {
+        setConversations([]); // If no conversations, set to empty array
       }
+      setLoadingConversations(false); // Stop loading spinner when data is received
     });
   
-    // Handle online users
-    socket.on("onlineUsers", (users) => setOnlineUsers(users));
-  
-    // Handle receiving a friend request
-    socket.on("receive-friend-request", (request) => {
-      setFriendRequests((prev) => [request, ...prev]);
-      toast.info(`New friend request from ${request.sender.name}`);
-    });
-  
-   
-  
-    // Clean up socket event listeners when the component unmounts or userdata or socket changes
+    // Cleanup the socket listener when the component is unmounted or dependencies change
     return () => {
       socket.off("conversation");
-      socket.off("onlineUsers");
-      socket.off("message");
-      socket.off("receive-friend-request");
     };
-  }, [socket, userdata?._id]);
+  }, [socket, userdata?._id]); // Dependency on socket and userdata (user ID)
+  
+  
+  // When the user navigates away and comes back, we ensure the state gets updated
+
   
   
 
