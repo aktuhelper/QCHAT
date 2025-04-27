@@ -26,6 +26,9 @@ const Sidebar = () => {
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loadingConversations, setLoadingConversations] = useState(true);
+// Video call state
+const [videoCallIncoming, setVideoCallIncoming] = useState(false);
+const [videoCallerInfo, setVideoCallerInfo] = useState(null);
 
   const fetchFriendRequests = useCallback(async () => {
     try {
@@ -69,18 +72,21 @@ const Sidebar = () => {
   useEffect(() => {
     if (!socket || !userdata?._id) return;
   
+    // Register the user to the socket server
     socket.emit("register-user", userdata._id);
     console.log("Registering socket for user:", userdata._id);
   
-    // Show loading before fetching
+    // Show loading before fetching conversations
     setLoadingConversations(true);
     socket.emit("fetchConversations");
   
+    // Handle the conversations
     socket.on("conversation", (convos) => {
       setConversations(convos.length === 0 ? [] : convos);
       setLoadingConversations(false); // Done loading
     });
   
+    // Handle incoming messages
     socket.on("message", ({ senderId, receiverId, message }) => {
       if (receiverId === userdata._id) {
         setUnreadCounts((prev) => ({
@@ -90,12 +96,18 @@ const Sidebar = () => {
       }
     });
   
+    // Handle online users
     socket.on("onlineUsers", (users) => setOnlineUsers(users));
+  
+    // Handle receiving a friend request
     socket.on("receive-friend-request", (request) => {
       setFriendRequests((prev) => [request, ...prev]);
       toast.info(`New friend request from ${request.sender.name}`);
     });
   
+   
+  
+    // Clean up socket event listeners when the component unmounts or userdata or socket changes
     return () => {
       socket.off("conversation");
       socket.off("onlineUsers");
@@ -103,6 +115,7 @@ const Sidebar = () => {
       socket.off("receive-friend-request");
     };
   }, [socket, userdata?._id]);
+  
   
 
   const handleLogout = async (e) => {
@@ -323,37 +336,37 @@ const Sidebar = () => {
                 )}
               </>
               ) : loadingConversations ? (
-                <div className="flex flex-col justify-center items-center mt-10 text-slate-400">
-                  <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-blue-500 border-solid mb-4"></div>
-                  <p className="text-sm">Fetching conversations...</p>
-                </div>
-              ) : conversations.length === 0 ? (
-                <div className="flex flex-col items-center justify-center mt-10 text-slate-400">
-                  <GoArrowUpLeft size={50} />
-                  <p className="mt-4 text-lg font-semibold text-center">
-                    No conversations yet.
-                  </p>
-                  <p className="mt-2 text-sm text-center text-gray-500">
-                    Explore users to start a conversation.
-                  </p>
-                </div>
-              ) : (
-                conversations.map((conv) => {
-                  const otherUser = conv.sender._id === userdata._id ? conv.receiver : conv.sender;
-                  const isOnline = onlineUsers.includes(otherUser?._id);
-                  const unread = unreadCounts[otherUser._id] || 0;
-                  return (
-                    <NavLink
-                      to={`/${otherUser._id}`}
-                      state={{ recipient: otherUser }}
-                      key={conv._id}
-                      onClick={() =>
-                        setUnreadCounts((prev) => {
-                          const updated = { ...prev };
-                          delete updated[otherUser._id];
-                          return updated;
-                        })
-                      }
+  <div className="flex flex-col justify-center items-center mt-10 text-slate-400">
+    <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-blue-500 border-solid mb-4"></div>
+    <p className="text-sm">Fetching conversations...</p>
+  </div>
+) : conversations.length === 0 ? (
+  <div className="flex flex-col items-center justify-center mt-10 text-slate-400">
+    <GoArrowUpLeft size={50} />
+    <p className="mt-4 text-lg font-semibold text-center">
+      No conversations yet.
+    </p>
+    <p className="mt-2 text-sm text-center text-gray-500">
+      Explore users to start a conversation.
+    </p>
+  </div>
+) : (
+  conversations.map((conv) => {
+    const otherUser = conv.sender._id === userdata._id ? conv.receiver : conv.sender;
+    const isOnline = onlineUsers.includes(otherUser?._id);
+    const unread = unreadCounts[otherUser._id] || 0;
+    return (
+      <NavLink
+        to={`/${otherUser._id}`}
+        state={{ recipient: otherUser }}
+        key={conv._id}
+        onClick={() =>
+          setUnreadCounts((prev) => {
+            const updated = { ...prev };
+            delete updated[otherUser._id];
+            return updated;
+          })
+        }
                   className="relative flex items-center gap-3 py-3 px-2 hover:bg-black/40 hover:backdrop-blur-sm rounded-full cursor-pointer"
                 >
                   <Avatar
