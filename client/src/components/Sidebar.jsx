@@ -11,7 +11,6 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { NavLink, useNavigate } from "react-router-dom";
 
-
 const Sidebar = () => {
   const navigate = useNavigate();
   const { userdata, socket, backendUrl } = useContext(AppContent);
@@ -27,7 +26,7 @@ const Sidebar = () => {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loadingConversations, setLoadingConversations] = useState(true);
 
-
+  // Fetch Friend Requests
   const fetchFriendRequests = useCallback(async () => {
     try {
       setLoadingFriendRequests(true);
@@ -40,6 +39,7 @@ const Sidebar = () => {
     }
   }, [userdata, backendUrl]);
 
+  // Fetch Friends
   const fetchFriends = useCallback(async () => {
     try {
       setLoadingFriends(true);
@@ -66,47 +66,53 @@ const Sidebar = () => {
     if (savedFriendRequests) setFriendRequests(savedFriendRequests);
     if (savedFriends) setFriends(savedFriends);
   }, []);
- 
 
-
+  // Fetch Conversations from localStorage or server
   useEffect(() => {
     if (!userdata?._id) return; // Don't run if user ID is not available
-  
+
     console.log("Checking localStorage for conversations...");
     const storedConversations = JSON.parse(localStorage.getItem('conversations'));
     if (storedConversations) {
       console.log("Found conversations in localStorage:", storedConversations);
-      setConversations(storedConversations); // Use localStorage data if available
-      setLoadingConversations(false); // If conversations are found, stop loading spinner
+      setConversations(storedConversations);
+      setLoadingConversations(false);
     } else {
       console.log("No conversations found in localStorage, fetching from server...");
-      setLoadingConversations(true); // Show the loading spinner while fetching
-      socket.emit("fetchConversations"); // Request conversations from server
+      setLoadingConversations(true);
+      socket.emit("fetchConversations");
     }
-  
+
     // Listen for server response (socket event 'conversation')
     socket.on("conversation", (convos) => {
-      console.log("Received conversations from server:", convos); // Log the conversations received from server
+      console.log("Received conversations from server:", convos);
       if (convos && convos.length > 0) {
         setConversations(convos);
-        localStorage.setItem('conversations', JSON.stringify(convos)); // Persist to localStorage
+        localStorage.setItem('conversations', JSON.stringify(convos));
       } else {
-        setConversations([]); // If no conversations, set to empty array
+        setConversations([]);
       }
-      setLoadingConversations(false); // Stop loading spinner when data is received
+      setLoadingConversations(false);
     });
-  
-    // Cleanup the socket listener when the component is unmounted or dependencies change
+
     return () => {
       socket.off("conversation");
     };
-  }, [socket, userdata?._id]); // Dependency on socket and userdata (user ID)
-  
-  
-  // When the user navigates away and comes back, we ensure the state gets updated
+  }, [socket, userdata?._id]);
 
-  
-  
+  // Listen for online users and update online status
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("onlineUsers", (onlineUserIds) => {
+      setOnlineUsers(onlineUserIds); // Update the state with the online users
+    });
+
+    // Cleanup the socket listener when the component unmounts or dependencies change
+    return () => {
+      socket.off("onlineUsers"); // Clean up the socket listener
+    };
+  }, [socket]);
 
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -128,22 +134,22 @@ const Sidebar = () => {
     try {
       const response = await axios.post(`${backendUrl}/api/friends/accept/${requestId}`, { userId });
       const newFriend = response.data.friend;
-  
+
       setFriendRequests((prev) => {
         const updated = prev.filter((r) => r._id !== requestId);
         localStorage.setItem('friendRequests', JSON.stringify(updated));
         return updated;
       });
-  
-      // ✅ Better: Re-fetch from backend to ensure consistent data
+
+      // ✅ Re-fetch from backend to ensure consistent data
       await fetchFriends();
-  
+
       toast.success('Friend request accepted!');
     } catch {
       toast.error('Error accepting friend request.');
     }
   };
-  
+
   const handleRejectRequest = async (requestId) => {
     const userId = userdata._id;
     try {
