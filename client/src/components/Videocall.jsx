@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { AppContent } from "../context/AppContext";
 import { FiPhone } from "react-icons/fi";
@@ -6,7 +6,6 @@ import styles from "./VideoCall.module.css";
 
 const VideoCall = () => {
   const { targetUserId: paramId } = useParams();
-  const [mediaPermissions, setMediaPermissions] = useState(false); // Track media permissions
 
   const {
     socket,
@@ -18,7 +17,7 @@ const VideoCall = () => {
     targetUser,
     localVideoRef,
     remoteVideoRef,
-    remoteStream,
+    remoteStream, // 👈 get remote stream from context
     ringtoneRef,
     startCall,
     acceptCall,
@@ -33,25 +32,7 @@ const VideoCall = () => {
     }
   }, [paramId, setTargetUserId]);
 
-  // Check media permissions on mount
-  useEffect(() => {
-    const checkMediaPermissions = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
-        setMediaPermissions(true);
-        stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately after checking
-      } catch (err) {
-        setMediaPermissions(false);
-        alert("You need to grant permission to use your camera and microphone.");
-      }
-    };
-
-    checkMediaPermissions();
-  }, []);
-
+  // 👇 Reapply remoteStream if available after mount
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -59,11 +40,11 @@ const VideoCall = () => {
   }, [remoteStream, remoteVideoRef]);
 
   if (!userdata._id || !socket) return <div>Loading...</div>;
-  
-  if (!mediaPermissions) {
-    return null; // Don't render the call interface if permissions aren't granted
-  }
-
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
   return (
     <div className={styles.videoCallContainer}>
       {(callIncoming || calling || inCall) && (

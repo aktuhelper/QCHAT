@@ -1,37 +1,22 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContent } from '../context/AppContext';
 import styles from './IncomingCallPopup.module.css';
 
-const IncomingCallPopup = () => {
-  const [mediaPermissions, setMediaPermissions] = useState(false); // Track media permissions
 
+const IncomingCallPopup = () => {
   const {
     callIncoming,
     incomingCallFrom,
-    declineCall, 
-    acceptCall, 
+    declineCall, // ✅ Use context's decline logic
+    acceptCall,  // ✅ Use context's accept logic (handles peer connection etc.)
   } = useContext(AppContent);
 
   const navigate = useNavigate();
 
-  const checkMediaPermissions = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-      setMediaPermissions(true);
-      stream.getTracks().forEach(track => track.stop()); // Stop the stream immediately after checking
-    } catch (err) {
-      setMediaPermissions(false);
-      alert("You need to grant permission to use your camera and microphone.");
-    }
-  };
-
   const handleAccept = async () => {
-    await acceptCall();
-    navigate(`/videoCall/${incomingCallFrom?.from}`);
+    await acceptCall(); // 👈 This calls the logic defined in AppContext
+    navigate(`/videoCall/${incomingCallFrom?.from}`); // 👈 Optional: navigate after setting up
   };
 
   if (!callIncoming || !incomingCallFrom) return null;
@@ -51,13 +36,7 @@ const IncomingCallPopup = () => {
         <button onClick={declineCall} className={`${styles.button} ${styles.declineBtn}`}>
           Decline
         </button>
-        <button 
-          onClick={async () => {
-            await checkMediaPermissions();
-            if (mediaPermissions) handleAccept();
-          }} 
-          className={`${styles.button} ${styles.acceptBtn}`}
-        >
+        <button onClick={handleAccept} className={`${styles.button} ${styles.acceptBtn}`}>
           Accept
         </button>
       </div>
