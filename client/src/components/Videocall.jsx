@@ -22,7 +22,6 @@ const VideoCall = () => {
     startCall,
     endCall,
     setTargetUserId,
-    getMedia,
   } = useContext(AppContent);
 
   // Set target user ID from route
@@ -37,11 +36,13 @@ const VideoCall = () => {
     if (localVideoRef.current && localStream?.current) {
       localVideoRef.current.srcObject = localStream.current;
     }
-  }, [localVideoRef, localStream?.current]);
+  }, [localStream?.current]); // localVideoRef doesn't need to be in deps if it's a ref
 
-  // Access media devices on component mount
+  // Cleanup on unmount
   useEffect(() => {
-    getMedia();
+    return () => {
+      endCall();
+    };
   }, []);
 
   if (!userdata._id || !socket) return <div>Loading...</div>;
