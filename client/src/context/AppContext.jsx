@@ -234,33 +234,33 @@ export const AppContextProvider = (props) => {
         localStream.current.getTracks().forEach(track => track.stop());
         localStream.current = null;
       }
-  
+
       // Check if the user has granted permissions
       const devices = await navigator.mediaDevices.enumerateDevices();
       const hasCamera = devices.some(device => device.kind === 'videoinput');
       const hasAudio = devices.some(device => device.kind === 'audioinput');
-  
+
       if (!hasCamera || !hasAudio) {
         alert("No camera or microphone detected. Please connect them and refresh.");
         return;
       }
-  
+
       // Request permission from the user to access camera and microphone
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStream.current = stream;
-  
+
       // Set the local video stream to show it in the UI
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
-  
+
       // Add the tracks to the peer connection for video call
       stream.getTracks().forEach(track => {
         peerConnection.current?.addTrack(track, stream);
       });
     } catch (error) {
       console.error("Error accessing media devices:", error);
-  
+
       if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
         alert("You need to allow camera and microphone access for the video call.");
       } else {
@@ -268,7 +268,7 @@ export const AppContextProvider = (props) => {
       }
     }
   };
-  
+
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
 
