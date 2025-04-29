@@ -1,35 +1,19 @@
-import { createContext, useEffect, useState, useRef } from "react"; // <-- Correct placement of useRef
+import { createContext, useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { io } from "socket.io-client";
 
-// Function to base64 URL decode
 const base64UrlDecode = (base64Url) => {
-  // Replace base64 URL-safe characters
-  let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  // Pad with '=' to make it a valid base64 string
-  base64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
-  // Decode the base64 string into a string
-  const decoded = atob(base64);
-  return decoded;
+  let base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+  base64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
+  return atob(base64);
 };
 
-// Function to decode JWT
 const decodeJwt = (token) => {
   if (!token) return null;
-  
-  // Split token into parts
-  const parts = token.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid token format');
-  }
-
-  // Decode the payload part (the second part of the JWT)
-  const payload = parts[1];
-  const decodedPayload = base64UrlDecode(payload);
-  
-  // Parse the JSON string to an object
-  return JSON.parse(decodedPayload);
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("Invalid token format");
+  return JSON.parse(base64UrlDecode(parts[1]));
 };
 
 export const AppContent = createContext();
@@ -40,12 +24,7 @@ export const AppContextProvider = (props) => {
 
   const [socket, setSocket] = useState(null);
   const [isLoggedin, setIsLoggedin] = useState(undefined);
-  const [userdata, setUserdata] = useState({
-    name: "",
-    email: "",
-    profile_pic: "",
-    _id: "",
-  });
+  const [userdata, setUserdata] = useState({ name: "", email: "", profile_pic: "", _id: "" });
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [onlineUsersCount, setOnlineUsersCount] = useState(0);
   const [chatUser, setChatUser] = useState(null);
@@ -71,7 +50,7 @@ export const AppContextProvider = (props) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/user/data`);
       if (data.success) {
-        setUserdata(data.user); // Save user data into context
+        setUserdata(data.user);
         setupSocketConnection(data.user._id);
       } else {
         toast.error(data.message);
@@ -86,22 +65,15 @@ export const AppContextProvider = (props) => {
 
     const socketConnection = io(backendUrl, { query: { userId } });
 
-    socketConnection.on("connect", () => {
-      socketConnection.emit("user-online", userId);
+    socketConnection.on("connect", () => socketConnection.emit("user-online", userId));
+    socketConnection.on("disconnect", () => socketConnection.emit("user-offline", userId));
+
+    socketConnection.on("onlineUsers", (users) => {
+      setOnlineUsers(new Set(users));
+      setOnlineUsersCount(users.length);
     });
 
-    socketConnection.on("disconnect", () => {
-      socketConnection.emit("user-offline", userId);
-    });
-
-    socketConnection.on("onlineUsers", (onlineUsersList) => {
-      setOnlineUsers(new Set(onlineUsersList));
-      setOnlineUsersCount(onlineUsersList.length);
-    });
-
-    socketConnection.on("message-user", (payload) => {
-      setChatUser(payload);
-    });
+    socketConnection.on("message-user", (payload) => setChatUser(payload));
 
     socketConnection.on("random-chat-start", ({ chatRoomId, partner }) => {
       setRandomChatRoom(chatRoomId);
@@ -118,7 +90,6 @@ export const AppContextProvider = (props) => {
 
   useEffect(() => {
     getAuthState();
-
     return () => {
       if (socket) {
         socket.disconnect();
@@ -128,48 +99,44 @@ export const AppContextProvider = (props) => {
   }, []);
 
   useEffect(() => {
-    if (userdata._id) {
-      setupSocketConnection(userdata._id);
-    }
-  }, [userdata]);
+    if (userdata._id) setupSocketConnection(userdata._id);
+  }, [userdata._id]);
 
   const googleLogin = async (credential) => {
     try {
-      // Decode the token using custom decodeJwt function
       const decoded = decodeJwt(credential);
-      const { name, email, picture } = decoded;
+      const { name, email, picture, sub } = decoded;
 
-      // Only update userdata if name and profile_pic are not set in the database
       if (!userdata.name || !userdata.profile_pic) {
         setUserdata({
-          name: name || userdata.name, // Use existing name if not from Google
+          name: name || userdata.name,
           email,
-          profile_pic: picture || userdata.profile_pic, // Use existing profile_pic if not from Google
-          _id: decoded.sub, // Use the 'sub' as the unique user ID
+          profile_pic: picture || userdata.profile_pic,
+          _id: sub,
         });
       }
 
-      // Now send token to backend for authentication
-      const { data } = await axios.post(`${backendUrl}/api/auth/google-login`, { token: credential }, { withCredentials: true });
+      const { data } = await axios.post(`${backendUrl}/api/auth/google-login`, { token: credential });
 
       if (data.success) {
         setIsLoggedin(true);
         toast.success(`Welcome ${name}!`);
-        await getUserData(); // Fetch user data
+        await getUserData();
       } else {
         toast.error(data.message);
       }
-    } catch (error) {
+    } catch {
       toast.error("Google login failed.");
     }
   };
 
-// Video Calling States
+  // --- Video Call States ---
   const [callIncoming, setCallIncoming] = useState(false);
   const [calling, setCalling] = useState(false);
   const [inCall, setInCall] = useState(false);
   const [incomingCallFrom, setIncomingCallFrom] = useState(null);
   const [targetUser, setTargetUser] = useState(null);
+  const [targetUserId, setTargetUserId] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
 
   const localVideoRef = useRef(null);
@@ -177,28 +144,24 @@ export const AppContextProvider = (props) => {
   const peerConnection = useRef(null);
   const localStream = useRef(null);
   const ringtoneRef = useRef(null);
-  const [targetUserId, setTargetUserId] = useState(null);
 
   useEffect(() => {
     if (!socket || !userdata?._id) return;
 
     socket.emit("video-register", userdata._id);
-
     socket.on("video-registered", () => setIsRegistered(true));
 
     socket.on("video-incoming-call", ({ from, caller, offer }) => {
       if (!from || !caller || !offer) return;
 
-      setIncomingCallFrom({
-        from,
-        username: caller.name,
-        profilePic: caller.profile_pic,
-        offer,
-      });
-
+      setIncomingCallFrom({ from, username: caller.name, profilePic: caller.profile_pic, offer });
       setCallIncoming(true);
-      ringtoneRef.current?.play().catch((err) => console.warn("Ringtone error:", err));
-      navigator.vibrate?.([500, 300, 500, 300]);
+      try {
+        ringtoneRef.current?.play();
+      } catch (err) {
+        console.warn("Ringtone error:", err);
+      }
+      navigator.vibrate?.([500, 300, 500]);
     });
 
     socket.on("video-call-answered", async ({ answer }) => {
@@ -218,7 +181,11 @@ export const AppContextProvider = (props) => {
 
     socket.on("video-ice-candidate", async ({ candidate }) => {
       if (candidate && peerConnection.current) {
-        await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+        try {
+          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error("ICE Candidate error:", err);
+        }
       }
     });
 
@@ -244,62 +211,85 @@ export const AppContextProvider = (props) => {
       stopRingtoneAndVibration();
       endCall();
     };
-  }, [socket, userdata]);
+  }, [socket, userdata?._id]);
 
   const stopRingtoneAndVibration = () => {
-    if (ringtoneRef.current) {
-      ringtoneRef.current.pause();
-      ringtoneRef.current.currentTime = 0;
+    try {
+      if (ringtoneRef.current) {
+        ringtoneRef.current.pause();
+        ringtoneRef.current.currentTime = 0;
+      }
+      navigator.vibrate?.(0);
+    } catch (e) {
+      console.warn("Vibration stop error:", e);
     }
-    navigator.vibrate?.(0);
   };
 
   const getPeerTarget = () => (calling ? targetUserId : incomingCallFrom?.from);
 
   const getMedia = async () => {
-    if (localStream.current) {
-      localStream.current.getTracks().forEach(track => track.stop());
-    }
-
     try {
+      // First, check if a stream already exists and stop any active tracks
+      if (localStream.current) {
+        localStream.current.getTracks().forEach(track => track.stop());
+        localStream.current = null;
+      }
+  
+      // Check if the user has granted permissions
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasCamera = devices.some(device => device.kind === 'videoinput');
+      const hasAudio = devices.some(device => device.kind === 'audioinput');
+  
+      if (!hasCamera || !hasAudio) {
+        alert("No camera or microphone detected. Please connect them and refresh.");
+        return;
+      }
+  
+      // Request permission from the user to access camera and microphone
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStream.current = stream;
-      localVideoRef.current.srcObject = stream;
-
+  
+      // Set the local video stream to show it in the UI
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+  
+      // Add the tracks to the peer connection for video call
       stream.getTracks().forEach(track => {
         peerConnection.current?.addTrack(track, stream);
       });
     } catch (error) {
-      alert("Error accessing media devices. Check your settings.");
-      console.error(error);
+      console.error("Error accessing media devices:", error);
+  
+      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+        alert("You need to allow camera and microphone access for the video call.");
+      } else {
+        alert("Could not access camera or microphone. Please check permissions and try again.");
+      }
     }
   };
-
+  
   const createPeerConnection = () => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("video-ice-candidate", {
-          to: getPeerTarget(),
-          candidate: event.candidate,
-        });
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) {
+        socket.emit("video-ice-candidate", { to: getPeerTarget(), candidate });
       }
     };
 
     pc.ontrack = (event) => {
-      if (event.streams?.length > 0) {
+      if (event.streams?.[0]) {
         const remoteStream = event.streams[0];
-        const assignStream = () => {
+        let retries = 0;
+        const tryAttach = () => {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
-          } else {
-            setTimeout(assignStream, 100); // Retry after short delay
+          } else if (retries++ < 5) {
+            setTimeout(tryAttach, 200);
           }
         };
-        assignStream(); // Try to assign stream
+        tryAttach();
       }
     };
 
@@ -310,11 +300,10 @@ export const AppContextProvider = (props) => {
     if (!isRegistered || !targetUserId) return;
 
     try {
-      const response = await axios.get(`${backendUrl}/api/users/${targetUserId}`);
-      setTargetUser(response.data);
-      console.log("Fetched target user:", response.data);
+      const { data } = await axios.get(`${backendUrl}/api/users/${targetUserId}`);
+      setTargetUser(data);
     } catch (err) {
-      console.error("Failed to fetch user info:", err);
+      console.error("Failed to fetch target user:", err);
       return;
     }
 
@@ -324,7 +313,7 @@ export const AppContextProvider = (props) => {
     const offer = await peerConnection.current.createOffer();
     await peerConnection.current.setLocalDescription(offer);
 
-    setCalling(true); // Only after fetching user
+    setCalling(true);
 
     socket.emit("video-call-user", {
       to: targetUserId,
@@ -335,34 +324,26 @@ export const AppContextProvider = (props) => {
   };
 
   const acceptCall = async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert("Media devices are not supported by your browser.");
-      return;
-    }
-  
+    if (!incomingCallFrom?.offer) return;
+
     try {
       peerConnection.current = createPeerConnection();
-      await getMedia();  // Ensure this is called on the same page
-  
-      const offer = incomingCallFrom?.offer;
-      if (!offer) return;
-  
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+      await getMedia();
+      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(incomingCallFrom.offer));
       const answer = await peerConnection.current.createAnswer();
       await peerConnection.current.setLocalDescription(answer);
-  
-      socket.emit("video-answer-call", { to: incomingCallFrom?.from, answer });
-  
+
+      socket.emit("video-answer-call", { to: incomingCallFrom.from, answer });
+
       stopRingtoneAndVibration();
       setCallIncoming(false);
       setInCall(true);
       setIncomingCallFrom(null);
     } catch (err) {
-      console.error("Error accepting the call:", err);
-      alert("Error accessing media devices. Check your settings.");
+      console.error("Accept call error:", err);
+      alert("Failed to accept the call.");
     }
   };
-  
 
   const declineCall = () => {
     socket.emit("video-decline-call", { to: incomingCallFrom?.from });
@@ -375,7 +356,7 @@ export const AppContextProvider = (props) => {
     peerConnection.current?.close();
     peerConnection.current = null;
 
-    localStream.current?.getTracks().forEach(track => track.stop());
+    localStream.current?.getTracks().forEach((t) => t.stop());
     localStream.current = null;
 
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
@@ -407,13 +388,13 @@ export const AppContextProvider = (props) => {
         randomChatPartner,
         randomChatRoom,
         callIncoming,
-        setCallIncoming,     // ✅ ADDED
+        setCallIncoming,
         calling,
-        setCalling,          // ✅ ADDED
+        setCalling,
         inCall,
-        setInCall,           // ✅ ADDED
+        setInCall,
         incomingCallFrom,
-        setIncomingCallFrom, // ✅ (optional but useful)
+        setIncomingCallFrom,
         targetUser,
         targetUserId,
         setTargetUserId,
