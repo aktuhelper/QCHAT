@@ -18,10 +18,11 @@ const VideoCall = () => {
     targetUser,
     localVideoRef,
     remoteVideoRef,
+    localStream,
     startCall,
     endCall,
     setTargetUserId,
-    getMedia, // ⬅️ Make sure getMedia is exposed in AppContent
+    getMedia,
   } = useContext(AppContent);
 
   // Set target user ID from route
@@ -31,33 +32,23 @@ const VideoCall = () => {
     }
   }, [paramId, setTargetUserId]);
 
-  // Attach local stream if available
+  // Attach local stream to video element
   useEffect(() => {
-    if (localVideoRef.current && !localVideoRef.current.srcObject) {
-      const stream = window.localStreamRef;
-      if (stream) {
-        localVideoRef.current.srcObject = stream;
-      }
+    if (localVideoRef.current && localStream?.current) {
+      localVideoRef.current.srcObject = localStream.current;
     }
-  }, [localVideoRef]);
-
-  // Attach remote stream if available
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteVideoRef.current.srcObject === null && window.remoteStreamRef) {
-      remoteVideoRef.current.srcObject = window.remoteStreamRef;
-    }
-  }, [remoteVideoRef]);
+  }, [localVideoRef, localStream?.current]);
 
   // Access media devices on component mount
   useEffect(() => {
-    getMedia(); // Ensure camera/mic access and attach streams
+    getMedia();
   }, []);
 
   if (!userdata._id || !socket) return <div>Loading...</div>;
 
   const handleEndCall = () => {
     endCall();
-    navigate(-1); // Go back to previous page
+    navigate(-1); // Go back
   };
 
   return (

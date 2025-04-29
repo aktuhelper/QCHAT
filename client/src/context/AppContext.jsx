@@ -259,22 +259,34 @@ export const AppContextProvider = (props) => {
 
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-
+  
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) {
         socket.emit("video-ice-candidate", { to: getPeerTarget(), candidate });
       }
     };
-
+  
     pc.ontrack = (event) => {
       const remoteStream = event.streams?.[0];
       if (remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
+        let attempts = 0;
+        const trySetRemote = () => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+          } else if (attempts < 10) {
+            attempts++;
+            setTimeout(trySetRemote, 200);
+          } else {
+            console.warn("remoteVideoRef not available to set stream.");
+          }
+        };
+        trySetRemote();
       }
     };
-
+  
     return pc;
   };
+  
 
   const startCall = async () => {
     if (!isRegistered || !targetUserId) return;
