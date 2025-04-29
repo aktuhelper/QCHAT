@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { AppContent } from '../context/AppContext';
 import styles from './IncomingCallPopup.module.css';
 
-
 const IncomingCallPopup = () => {
   const {
     callIncoming,
@@ -14,12 +13,13 @@ const IncomingCallPopup = () => {
 
   const navigate = useNavigate();
 
-
   const handleAccept = async () => {
     await acceptCall(); // 👈 This calls the logic defined in AppContext
-    navigate(`/videoCall/${incomingCallFrom?.from}`); // 👈 Optional: navigate after setting up
+    // Navigate to the video call page
+    navigate(`/videoCall/${incomingCallFrom?.from}`);
   };
 
+  // Early return if there is no incoming call
   if (!callIncoming || !incomingCallFrom) return null;
 
   return (
@@ -29,7 +29,7 @@ const IncomingCallPopup = () => {
           src={incomingCallFrom.profilePic || "/default-profile.png"}
           alt="Caller"
           className={styles.callerImage}
-          onError={(e) => { e.target.src = "/default-profile.png"; }}
+          onError={(e) => { e.target.src = "/default-profile.png"; }}  // Fallback to default image
         />
         <p>📞 Incoming call from <strong>{incomingCallFrom.username}</strong></p>
       </div>
