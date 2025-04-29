@@ -1,12 +1,11 @@
 import React, { useContext, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { AppContent } from "../context/AppContext";
 import { FiPhone } from "react-icons/fi";
 import styles from "./VideoCall.module.css";
 
 const VideoCall = () => {
   const { targetUserId: paramId } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
 
   const {
@@ -23,12 +22,7 @@ const VideoCall = () => {
     startCall,
     endCall,
     setTargetUserId,
-    acceptCall,
-    attachMediaToRefs,
-    remoteStream,
   } = useContext(AppContent);
-
-  const isAccepting = new URLSearchParams(location.search).get("accepting") === "true";
 
   // Set target user ID from route
   useEffect(() => {
@@ -37,19 +31,12 @@ const VideoCall = () => {
     }
   }, [paramId, setTargetUserId]);
 
-  // Accept the call if accepting query flag is true
+  // Attach local stream to video element
   useEffect(() => {
-    if (isAccepting && callIncoming && incomingCallFrom) {
-      acceptCall();
+    if (localVideoRef.current && localStream?.current) {
+      localVideoRef.current.srcObject = localStream.current;
     }
-  }, [isAccepting, callIncoming, incomingCallFrom]);
-
-  // Attach streams to video elements
-  useEffect(() => {
-    if (localStream?.current || remoteStream?.current) {
-      attachMediaToRefs();
-    }
-  }, [localStream?.current, remoteStream?.current]);
+  }, [localStream?.current]); // localVideoRef doesn't need to be in deps if it's a ref
 
   // Cleanup on unmount
   useEffect(() => {
@@ -62,7 +49,7 @@ const VideoCall = () => {
 
   const handleEndCall = () => {
     endCall();
-    navigate(-1);
+    navigate(-1); // Go back
   };
 
   return (
