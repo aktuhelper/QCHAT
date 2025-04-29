@@ -18,32 +18,40 @@ const VideoCall = () => {
     targetUser,
     localVideoRef,
     remoteVideoRef,
-    remoteStream,
-    ringtoneRef,
     startCall,
-    acceptCall,
-    declineCall,
     endCall,
     setTargetUserId,
   } = useContext(AppContent);
 
+  // Set target user ID from route
   useEffect(() => {
     if (paramId) {
       setTargetUserId(paramId);
     }
   }, [paramId, setTargetUserId]);
 
+  // Reattach local stream if missing (fix for accepting outside VideoCall page)
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    if (localVideoRef.current && !localVideoRef.current.srcObject) {
+      const stream = window.localStreamRef;
+      if (stream) {
+        localVideoRef.current.srcObject = stream;
+      }
     }
-  }, [remoteStream, remoteVideoRef]);
+  }, [localVideoRef]);
+
+  // Optional: handle remote stream re-binding
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteVideoRef.current.srcObject === null && window.remoteStreamRef) {
+      remoteVideoRef.current.srcObject = window.remoteStreamRef;
+    }
+  }, [remoteVideoRef]);
 
   if (!userdata._id || !socket) return <div>Loading...</div>;
 
   const handleEndCall = () => {
     endCall();
-    navigate(-1); // Navigate back to the previous page after ending the call
+    navigate(-1); // Go back to previous page
   };
 
   return (
@@ -56,9 +64,7 @@ const VideoCall = () => {
                 src={targetUser.profile_pic || "/default-profile.png"}
                 alt="Target User"
                 className={styles.profilePic}
-                onError={(e) => {
-                  e.target.src = "/default-profile.png";
-                }}
+                onError={(e) => (e.target.src = "/default-profile.png")}
               />
               <p>📞 Calling to {targetUser.name || "Target User"}</p>
             </div>
@@ -80,11 +86,7 @@ const VideoCall = () => {
       )}
 
       {!inCall && !calling && (
-        <button
-          onClick={startCall}
-          className={styles.startCallButton}
-          title="Start Call"
-        >
+        <button onClick={startCall} className={styles.startCallButton} title="Start Call">
           <FiPhone size={24} />
         </button>
       )}
