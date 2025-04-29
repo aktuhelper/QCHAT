@@ -50,6 +50,7 @@ export const acceptFriendRequest = async (req, res) => {
 };
 
 // Reject Friend Request
+// Reject Friend Request
 export const rejectFriendRequest = async (req, res) => {
   const { requestId } = req.params;
   const userId = req.body.userId;  // Get the user ID from the request body (after authentication)
@@ -69,7 +70,10 @@ export const rejectFriendRequest = async (req, res) => {
     // Call the rejectRequest method on the FriendRequest model
     await friendRequest.rejectRequest();
 
-    return res.status(200).json({ message: 'Friend request rejected' });
+    // Remove the friend request from the database after it is rejected
+    await FriendRequest.findByIdAndDelete(requestId);
+
+    return res.status(200).json({ message: 'Friend request rejected and removed from database' });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Something went wrong while rejecting the friend request', error: error.message });
