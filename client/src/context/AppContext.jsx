@@ -325,16 +325,17 @@ export const AppContextProvider = (props) => {
 
   const acceptCall = async () => {
     if (!incomingCallFrom?.offer) return;
-
+  
     try {
       peerConnection.current = createPeerConnection();
-      await getMedia();
+  
       await peerConnection.current.setRemoteDescription(new RTCSessionDescription(incomingCallFrom.offer));
+  
       const answer = await peerConnection.current.createAnswer();
       await peerConnection.current.setLocalDescription(answer);
-
+  
       socket.emit("video-answer-call", { to: incomingCallFrom.from, answer });
-
+  
       stopRingtoneAndVibration();
       setCallIncoming(false);
       setInCall(true);
@@ -344,6 +345,8 @@ export const AppContextProvider = (props) => {
       alert("Failed to accept the call.");
     }
   };
+  
+  
 
   const declineCall = () => {
     socket.emit("video-decline-call", { to: incomingCallFrom?.from });
@@ -405,6 +408,7 @@ export const AppContextProvider = (props) => {
         acceptCall,
         declineCall,
         endCall,
+        getMedia
       }}
     >
       {props.children}
