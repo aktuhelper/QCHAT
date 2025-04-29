@@ -16,8 +16,8 @@ const IncomingCallPopup = () => {
   const handleAccept = async () => {
  // 👈 This calls the logic defined in AppContext
     // Navigate to the video call page
-    navigate(`/videoCall/${incomingCallFrom?.from}`);
     await acceptCall();
+    navigate(`/videoCall/${incomingCallFrom?.from}`);
   };
 
   // Early return if there is no incoming call
