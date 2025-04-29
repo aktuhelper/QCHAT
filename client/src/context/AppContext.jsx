@@ -157,7 +157,7 @@ export const AppContextProvider = (props) => {
       setIncomingCallFrom({ from, username: caller.name, profilePic: caller.profile_pic, offer });
       setCallIncoming(true);
       ringtoneRef.current?.play().catch(console.warn);
-      navigator.vibrate?.([500, 300, 500]);
+      
     });
 
     socket.on("video-call-answered", async ({ answer }) => {
@@ -223,7 +223,6 @@ export const AppContextProvider = (props) => {
     try {
       ringtoneRef.current?.pause();
       ringtoneRef.current.currentTime = 0;
-      navigator.vibrate?.(0);
     } catch (e) {
       console.warn("Ringtone stop error:", e);
     }
