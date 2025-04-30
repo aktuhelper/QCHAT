@@ -17,7 +17,6 @@ const MessagePage = () => {
   const { socket, userdata, backendUrl } = useContext(AppContent);
   const [isTyping, setIsTyping] = useState(false);
   const navigate = useNavigate();
-
   const [message, setMessage] = useState({ text: "", imageUrl: "" });
   const [allMessages, setAllMessages] = useState([]);
   const [recipientStatus, setRecipientStatus] = useState("");
@@ -32,6 +31,10 @@ const MessagePage = () => {
   const [friendStatus, setFriendStatus] = useState(""); // Track if users are already friends
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [friendStatusMessage, setFriendStatusMessage] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletionMessage, setDeletionMessage] = useState("");
+
   // Fetch conversation ID and load previous messages
 
   const handleVideoCall = () => {
@@ -211,29 +214,36 @@ const MessagePage = () => {
   };
 
   const handleDeleteConversation = async () => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      setDeletionMessage("No conversation selected.");
+      recturn;
+    }
 
+    setIsDeleting(true);
     try {
-      const response = await axios.delete(`${backendUrl}/api/auth/deleteConversation/${conversationId}`, {
+      const response = await axios.delete(
+`${backendUrl}/api/auth/deleteConversation/${conversationId}`,
+{
         headers: {
-          Authorization: `Bearer ${userdata.token}`,
-        },
-      });
+Authorization: `Bearer ${userdata.token}`,
+},
+      }
+);
 
-      if (response.data.success) {
-        alert('Conversation deleted successfully.');
-        setAllMessages([]); // Clear the messages after deleting the conversation
-        setConversationId(null); // Clear conversation ID
-        localStorage.removeItem('allMessages'); // Remove messages from localStorage
+      if (response.status === 200 || response.status === 204 || response.data.success) {
+        setAllMessages([]);
+        setConversationId(null);
+        localStorage.removeItem('allMessages');
+        setDeletionMessage("Conversation deleted successfully.");
       } else {
-        alert('An error occurred while deleting the conversation.');
+        setDeletionMessage("Unexpected server response.");
       }
     } catch (error) {
-      console.error('Error deleting conversation:', error);
-      alert('An error occurred while deleting the conversation.');
+      setDeletionMessage(`Error: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
-
   const handleSendFriendRequest = async () => {
     if (!userdata?._id || friendStatus === "You are already friends." || isCheckingFriendStatus) return;
     setIsCheckingFriendStatus(true);
@@ -375,9 +385,14 @@ const MessagePage = () => {
 
 
           {/* Delete Button */}
-          <button className="text-gray-300 hover:bg-white/20 rounded-full p-2 transition" onClick={handleDeleteConversation}>
-            <FaTrash size={20} />
-          </button>
+          <button
+  className="text-gray-300 hover:bg-white/20 rounded-full p-2 transition"
+  onClick={() => setShowDeleteDialog(true)}
+>
+  <FaTrash size={20} />
+</button>
+
+
 
           <button className="text-gray-300 hover:text-gray-100 transition">
             <HiDotsVertical size={22} />
@@ -393,8 +408,8 @@ const MessagePage = () => {
 
   return (
     <div
-      key={msg._id || index}
-      ref={isLastMessage ? currentMessage : null} // ✅ Only attach ref to the last message
+      key={msg._id || `${index}-${msg.text}`} // <-- ADD THIS
+      ref={isLastMessage ? currentMessage : null}
       className={`flex justify-${msg.senderId === userdata?._id ? 'end' : 'start'} p-3 rounded-3xl min-w-[120px] min-h-[40px] shadow-lg`}
     >
       <div
@@ -419,6 +434,7 @@ const MessagePage = () => {
     </div>
   );
 })}
+
 
 
     {/* Typing Indicator Bubble (receiver side) */}
@@ -550,6 +566,46 @@ const MessagePage = () => {
       >
         Close
       </button>
+    </div>
+  </div>
+)}
+
+{showDeleteDialog && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-[#1A1A1A] rounded-xl p-6 w-11/12 max-w-sm text-center shadow-lg text-white">
+      {deletionMessage ? (
+        <>
+          <h2 className="text-lg font-semibold mb-4">✅ {deletionMessage}</h2>
+          <button
+            onClick={() => {
+              setShowDeleteDialog(false);
+              setDeletionMessage("");
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-full mt-4"
+          >
+            Close
+          </button>
+        </>
+      ) : (
+        <>
+          <h2 className="text-lg font-semibold mb-4">Are you sure you want to delete this conversation?</h2>
+          <div className="flex justify-center gap-4 mt-4">
+            <button
+              onClick={handleDeleteConversation}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-full"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </button>
+            <button
+              onClick={() => setShowDeleteDialog(false)}
+              className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-full"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
     </div>
   </div>
 )}
