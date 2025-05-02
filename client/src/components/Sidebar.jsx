@@ -25,7 +25,6 @@ const Sidebar = () => {
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loadingConversations, setLoadingConversations] = useState(true);
-
   const incrementUnread = (userId) => {
     setUnreadCounts((prev) => ({
       ...prev,
@@ -119,7 +118,6 @@ const Sidebar = () => {
   }, [socket]);
 
   useEffect(() => {
-    console.log("🧲 Setting up newMessage listener...");
     
     if (!socket || !userdata?._id) return;
   
@@ -184,13 +182,19 @@ const Sidebar = () => {
   
 
 
-
+  useEffect(() => {
+    if (socket && userdata?._id) {
+      socket.emit("register-user", userdata._id);
+    }
+  }, [socket, userdata?._id]);
+  
 
   useEffect(() => {
+    console.log("🧲 Setting up friend request listener...");
     if (!socket || !userdata?._id) return;
   
     // Listen for friend request event
-    socket.on('friendRequestReceived', (newRequest) => {
+    socket.on('receive-friend-request', (newRequest) => {
       console.log("📩 New Friend Request Received:", newRequest);
   
       // Add the new friend request to the local state
