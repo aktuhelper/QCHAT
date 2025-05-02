@@ -26,7 +26,19 @@ const Sidebar = () => {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loadingConversations, setLoadingConversations] = useState(true);
 
-
+  const incrementUnread = (userId) => {
+    setUnreadCounts((prev) => ({
+      ...prev,
+      [userId]: (prev[userId] || 0) + 1,
+    }));
+  };
+  const clearUnreadFor = (userId) =>
+    setUnreadCounts((prev) => {
+      const updated = { ...prev };
+      delete updated[userId];
+      return updated;
+    });
+  
   useEffect(() => {
     const savedUnread = localStorage.getItem("unreadCounts");
     if (savedUnread) {
@@ -69,33 +81,24 @@ const Sidebar = () => {
     }
   }, [userdata, backendUrl]);
 
-  useEffect(() => {
-    if (userdata?._id) {
-      fetchFriends();
-      fetchFriendRequests();
-    }
-  }, [fetchFriends, fetchFriendRequests, userdata?._id]);
+
 
   useEffect(() => {
-    const savedFriendRequests = localStorage.getItem('friendRequests');
-    const savedFriends = localStorage.getItem('friends');
-  
-    if (savedFriendRequests) {
+    const fetchData = async () => {
       try {
-        setFriendRequests(JSON.parse(savedFriendRequests));
-      } catch (error) {
-        console.error('Error parsing friendRequests from localStorage:', error);
+        await fetchFriends();
+        await fetchFriendRequests();
+      } catch {
+        const savedFriendRequests = localStorage.getItem('friendRequests');
+        const savedFriends = localStorage.getItem('friends');
+        if (savedFriendRequests) setFriendRequests(JSON.parse(savedFriendRequests));
+        if (savedFriends) setFriends(JSON.parse(savedFriends));
       }
-    }
+    };
   
-    if (savedFriends) {
-      try {
-        setFriends(JSON.parse(savedFriends));
-      } catch (error) {
-        console.error('Error parsing friends from localStorage:', error);
-      }
-    }
-  }, []);
+    if (userdata?._id) fetchData();
+  }, [userdata?._id]);
+  
   
 
   // Fetch Conversations from localStorage or server
@@ -116,23 +119,37 @@ const Sidebar = () => {
   }, [socket]);
 
   useEffect(() => {
+    console.log("🧲 Setting up newMessage listener...");
+    
     if (!socket || !userdata?._id) return;
   
+    // Define the handleNewMessage function inside the useEffect hook
     const handleNewMessage = (msg) => {
       console.log("📩 Received newMessage:", msg);
+  
+      // Ensure the message contains sender and receiver IDs
+      if (!msg?.sender?._id || !msg?.receiver?._id) {
+        console.warn("Invalid message structure:", msg);
+        return;
+      }
+  
+      // Determine the other user's ID
       const otherUserId = msg.sender._id === userdata._id ? msg.receiver._id : msg.sender._id;
-      setUnreadCounts((prev) => ({
-        ...prev,
-        [otherUserId]: (prev[otherUserId] || 0) + 1,
-      }));
+  
+      // Call incrementUnread with the other user's ID
+      incrementUnread(otherUserId);
     };
   
+    // Set up the listener for 'newMessage' event
     socket.on("newMessage", handleNewMessage);
   
+    // Clean up the listener when the component unmounts or dependencies change
     return () => {
       socket.off("newMessage", handleNewMessage);
     };
-  }, [socket, userdata?._id]);
+  
+  }, [socket, userdata?._id]);  // Dependencies: socket and userdata
+  
   
   useEffect(() => {
     localStorage.setItem("unreadCounts", JSON.stringify(unreadCounts));
@@ -440,13 +457,9 @@ const handleRejectRequest = async (requestId) => {
         to={`/${otherUser._id}`}
         state={{ recipient: otherUser }}
         key={conv._id}
-        onClick={() =>
-          setUnreadCounts((prev) => {
-            const updated = { ...prev };
-            delete updated[otherUser._id];
-            return updated;
-          })
-        }
+        onClick={() => clearUnreadFor(otherUser._id)}
+
+
                   className="relative flex items-center gap-3 py-3 px-2 hover:bg-black/40 hover:backdrop-blur-sm rounded-full cursor-pointer"
                 >
                   <Avatar
