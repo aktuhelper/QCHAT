@@ -26,6 +26,23 @@ const Sidebar = () => {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loadingConversations, setLoadingConversations] = useState(true);
 
+
+  useEffect(() => {
+    const savedUnread = localStorage.getItem("unreadCounts");
+    if (savedUnread) {
+      try {
+        setUnreadCounts(JSON.parse(savedUnread));
+      } catch (err) {
+        console.error("Failed to parse unreadCounts from localStorage", err);
+      }
+    }
+  }, []);
+  
+ 
+  
+  
+   // Only re-run effect if socket or userdata._id changes
+
   // Fetch Friend Requests
   const fetchFriendRequests = useCallback(async () => {
     try {
@@ -60,45 +77,29 @@ const Sidebar = () => {
   }, [fetchFriends, fetchFriendRequests, userdata?._id]);
 
   useEffect(() => {
-    const savedFriendRequests = JSON.parse(localStorage.getItem('friendRequests'));
-    const savedFriends = JSON.parse(localStorage.getItem('friends'));
-
-    if (savedFriendRequests) setFriendRequests(savedFriendRequests);
-    if (savedFriends) setFriends(savedFriends);
+    const savedFriendRequests = localStorage.getItem('friendRequests');
+    const savedFriends = localStorage.getItem('friends');
+  
+    if (savedFriendRequests) {
+      try {
+        setFriendRequests(JSON.parse(savedFriendRequests));
+      } catch (error) {
+        console.error('Error parsing friendRequests from localStorage:', error);
+      }
+    }
+  
+    if (savedFriends) {
+      try {
+        setFriends(JSON.parse(savedFriends));
+      } catch (error) {
+        console.error('Error parsing friends from localStorage:', error);
+      }
+    }
   }, []);
+  
 
   // Fetch Conversations from localStorage or server
-  useEffect(() => {
-    if (!userdata?._id) return; // Don't run if user ID is not available
-
-    console.log("Checking localStorage for conversations...");
-    const storedConversations = JSON.parse(localStorage.getItem('conversations'));
-    if (storedConversations) {
-      console.log("Found conversations in localStorage:", storedConversations);
-      setConversations(storedConversations);
-      setLoadingConversations(false);
-    } else {
-      console.log("No conversations found in localStorage, fetching from server...");
-      setLoadingConversations(true);
-      socket.emit("fetchConversations");
-    }
-
-    // Listen for server response (socket event 'conversation')
-    socket.on("conversation", (convos) => {
-      console.log("Received conversations from server:", convos);
-      if (convos && convos.length > 0) {
-        setConversations(convos);
-        localStorage.setItem('conversations', JSON.stringify(convos));
-      } else {
-        setConversations([]);
-      }
-      setLoadingConversations(false);
-    });
-
-    return () => {
-      socket.off("conversation");
-    };
-  }, [socket, userdata?._id]);
+ 
 
   // Listen for online users and update online status
   useEffect(() => {
@@ -114,6 +115,83 @@ const Sidebar = () => {
     };
   }, [socket]);
 
+  useEffect(() => {
+    if (!socket || !userdata?._id) return;
+  
+    const handleNewMessage = (msg) => {
+      console.log("📩 Received newMessage:", msg);
+      const otherUserId = msg.sender._id === userdata._id ? msg.receiver._id : msg.sender._id;
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [otherUserId]: (prev[otherUserId] || 0) + 1,
+      }));
+    };
+  
+    socket.on("newMessage", handleNewMessage);
+  
+    return () => {
+      socket.off("newMessage", handleNewMessage);
+    };
+  }, [socket, userdata?._id]);
+  
+  useEffect(() => {
+    localStorage.setItem("unreadCounts", JSON.stringify(unreadCounts));
+  }, [unreadCounts]);
+  
+
+  useEffect(() => {
+    if (!userdata || !userdata._id) return;
+    const fetchConversations = () => {
+      setLoadingConversations(true);
+      socket.emit("fetchConversations"); // Always fetch fresh data
+    };
+    
+  
+    const handleConversations = (convos) => {
+      if (Array.isArray(convos) && convos.length > 0) {
+        setConversations(convos);
+        localStorage.setItem('conversations', JSON.stringify(convos));
+      } else {
+        setConversations([]);
+      }
+      setLoadingConversations(false);
+    };
+  
+    fetchConversations();
+    socket.on("conversation", handleConversations);
+  
+    return () => {
+      socket.off("conversation", handleConversations);
+    };
+  }, [socket, userdata && userdata._id]);
+  
+
+
+
+
+  useEffect(() => {
+    if (!socket || !userdata?._id) return;
+  
+    // Listen for friend request event
+    socket.on('friendRequestReceived', (newRequest) => {
+      console.log("📩 New Friend Request Received:", newRequest);
+  
+      // Add the new friend request to the local state
+      setFriendRequests((prevRequests) => {
+        const updatedRequests = [...prevRequests, newRequest];
+        localStorage.setItem('friendRequests', JSON.stringify(updatedRequests));
+        return updatedRequests;
+      });
+  
+      toast.info('You have a new friend request!');
+    });
+  
+    // Cleanup the socket listener when the component unmounts
+    return () => {
+      socket.off('friendRequestReceived');
+    };
+  }, [socket, userdata?._id]);
+  
   const handleLogout = async (e) => {
     e.preventDefault();
     try {
@@ -150,22 +228,28 @@ const Sidebar = () => {
     }
   };
 
-  const handleRejectRequest = async (requestId) => {
-    const userId = userdata._id;
-    try {
-      await axios.post(`${backendUrl}/api/friends/reject/${requestId}`, { userId });
+const handleRejectRequest = async (requestId) => {
+  const userId = userdata._id;
+  try {
+    // Reject friend request on the backend
+    await axios.post(`${backendUrl}/api/friends/reject/${requestId}`, { userId });
 
-      setFriendRequests((prev) => {
-        const updated = prev.filter((r) => r._id !== requestId);
-        localStorage.setItem('friendRequests', JSON.stringify(updated));
-        return updated;
-      });
+    // Update the local state and remove the rejected request
+    setFriendRequests((prev) => {
+      const updated = prev.filter((r) => r._id !== requestId);
+      localStorage.setItem('friendRequests', JSON.stringify(updated));
+      return updated;
+    });
 
-      toast.error("Friend request rejected.");
-    } catch {
-      toast.error('Error rejecting friend request.');
-    }
-  };
+    // Re-fetch friend requests to ensure that the backend and frontend are synced
+    await fetchFriendRequests();
+
+    toast.error("Friend request rejected.");
+  } catch {
+    toast.error('Error rejecting friend request.');
+  }
+};
+
 
   if (!userdata) return <div className="text-white p-4">Loading...</div>;
 
@@ -389,10 +473,11 @@ const Sidebar = () => {
 
                   {/* ✅ Green unread badge on the right */}
                   {unread > 0 && (
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {unread}
-                    </span>
-                  )}
+  <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+    {unread}
+  </span>
+)}
+
                 </NavLink>
                 );
               })

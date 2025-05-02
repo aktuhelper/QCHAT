@@ -56,6 +56,10 @@ const MessagePage = () => {
     }
   };
   useEffect(() => {
+      fetchConversationId();
+  }, []);
+  
+  useEffect(() => {
     scrollToBottom();
   }, []);
   useEffect(() => {
@@ -212,11 +216,22 @@ const MessagePage = () => {
     setPreviewImage(""); // Clear the preview image
     setMessage((prev) => ({ ...prev, imageUrl: "" })); // Clear imageUrl from message state
   };
+useEffect(() => {
+  if (conversationId) {
+    localStorage.setItem("conversationId", conversationId);
+  }
+}, [conversationId]);
+useEffect(() => {
+  const storedId = localStorage.getItem("conversationId");
+  if (storedId) {
+    setConversationId(storedId);
+  }
+}, []);
 
   const handleDeleteConversation = async () => {
     if (!conversationId) {
       setDeletionMessage("No conversation selected.");
-      recturn;
+      return;
     }
 
     setIsDeleting(true);
@@ -233,8 +248,10 @@ Authorization: `Bearer ${userdata.token}`,
       if (response.status === 200 || response.status === 204 || response.data.success) {
         setAllMessages([]);
         setConversationId(null);
+        localStorage.removeItem('conversationId');
         localStorage.removeItem('allMessages');
         setDeletionMessage("Conversation deleted successfully.");
+        socket.emit('fetchConversations');
       } else {
         setDeletionMessage("Unexpected server response.");
       }
@@ -609,7 +626,9 @@ Authorization: `Bearer ${userdata.token}`,
     </div>
   </div>
 )}
-
+   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+        <h1 className="text-5xl font-bold text-red-400 opacity-10 select-none">Qchatt</h1>
+      </div>
     </div>
   );
 };
