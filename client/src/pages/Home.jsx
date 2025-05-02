@@ -9,7 +9,7 @@ const Home = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const basePath = location.pathname === "/";
-  const messages = ["Welcome to Chattsphere", "Connect with People"];
+  const messages = ["Welcome to Qchatt", "Connect with People"];
   const [text, setText] = useState("");
   const [messageIndex, setMessageIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
