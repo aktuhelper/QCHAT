@@ -195,24 +195,25 @@ const RandomChatPage = () => {
 
   const handleCheckFriendStatus = async () => {
     if (!userdata || !userdata._id || !randomUser?.userId) return;
-
+  
     try {
       const res = await axios.get(`${backendUrl}/api/user/${userdata._id}/friend-status/${randomUser.userId}`, {
         headers: {
           Authorization: `Bearer ${userdata.token}`,
         }
       });
+  
+      console.log("Friend status response:", res.data);  // Log the API response for debugging
+  
       if (res.data.isAlreadyFriends) {
         setFriendStatus("You are already friends.");
-        setFriendRequestSent(false);
       } else {
-        setFriendStatus("");
+        setFriendStatus("");  // Clear the status if they are not friends
       }
     } catch (error) {
       console.log("Friend status error:", error);
     }
   };
-
   const handleOpenFriendDialog = () => {
     handleCheckFriendStatus();
     setShowFriendDialog(true);
@@ -244,29 +245,33 @@ const RandomChatPage = () => {
   
   return (
     <div className="h-screen flex flex-col text-white bg-[url('../assets/bg.jpg')] bg-cover bg-center bg-no-repeat relative overflow-hidden">
-      <header className="fixed top-0 left-0 right-0 h-16 bg-[#1A1A1A] flex justify-between items-center px-4 shadow-md z-10">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="lg:hidden text-white hover:text-[#E74C3C] transition">
-            <FaAngleLeft size={25} />
-          </Link>
-          <Avatar width={50} height={50} imageUrl={userdata?.profile_pic} />
-          <div className="flex items-center">
-            <h3 className="font-semibold text-lg">{userdata?.name}</h3>
-            <div className="ml-2 flex items-center justify-center w-6 h-6 bg-green-600 rounded-full text-sm font-semibold">
-              {onlineUsersCount}
-            </div>
-            <span className="text-green-400 ml-1 text-sm">Online</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="text-gray-300 hover:bg-white/20 rounded-full p-2" onClick={handleOpenFriendDialog}>
-            <FaUserPlus size={20} />
-          </button>
-          <button onClick={handleClearChat} className="text-gray-300 hover:text-red-500 transition">
-            <FaTrash size={20} />
-          </button>
-        </div>
-      </header>
+  <header className="fixed top-0 left-0 right-0 h-16 bg-[#1A1A1A] flex justify-between items-center px-4 shadow-md z-10">
+  <div className="flex items-center gap-4">
+    <Link to="/" className="lg:hidden text-white hover:text-[#E74C3C] transition">
+      <FaAngleLeft size={25} />
+    </Link>
+    <Avatar width={50} height={50} imageUrl={userdata?.profile_pic} />
+    <div className="flex items-center">
+      <h3 className="font-semibold text-lg">{userdata?.name}</h3>
+      <div className="ml-2 flex items-center justify-center w-6 h-6 bg-green-600 rounded-full text-sm font-semibold">
+        {onlineUsersCount}
+      </div>
+      <span className="text-green-400 ml-1 text-sm">Online</span>
+    </div>
+  </div>
+  <div className="flex items-center gap-4">
+    {friendStatus !== "You are already friends." && ( // Only show the button if not already friends
+      <button className="text-gray-300 hover:bg-white/20 rounded-full p-2" onClick={handleOpenFriendDialog}>
+        <FaUserPlus size={20} />
+      </button>
+    )}
+    <button onClick={handleClearChat} className="text-gray-300 hover:text-red-500 transition">
+      <FaTrash size={20} />
+    </button>
+  </div>
+</header>
+
+
 
       {showFriendDialog && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-10">
@@ -330,36 +335,66 @@ const RandomChatPage = () => {
 {/* Chat Messages */}
 <div className="flex-1 overflow-y-auto pt-20 px-4 pb-24" ref={messageContainerRef}>
 {allMessages.map((msg, index) => {
-  const isSender = msg.senderId === userdata?._id; // Check if the message is sent by the user
-  return (
-    <div key={index} className={`flex ${isSender ? "justify-end" : "justify-start"} mb-4`}>
-      <div
-        className={`p-3 rounded-2xl max-w-[70%] text-sm ${ // Rounded corners with moderate padding
-          isSender ? "bg-[#0078FF] text-white" : "bg-[#1A1A1A] text-white"
-        }`}
-      >
-        {/* Message text */}
-        <p>{msg.text}</p>
+  const isSender = msg.senderId === userdata?._id;
+  const userAvatar = isSender ? userdata?.profile_pic : randomUser?.profile_pic;
 
-        {/* Image URL handling */}
-        {msg.imageUrl && (
-          <div className="mt-2">
-            <img
-              src={msg.imageUrl}
-              className="max-w-[200px] max-h-50 w-auto object-contain rounded-lg"
-              alt="Message"
+  return (
+    <div
+      key={index}
+      className={`flex ${isSender ? "justify-end" : "justify-start"} mb-4`}
+    >
+      <div className="flex flex-col relative max-w-[75%]">
+        {/* Avatar */}
+        {!isSender && (
+          <div className="mb-1 ml-1">
+            <Avatar
+              width={28}
+              height={28}
+              imageUrl={userAvatar}
+              className="rounded-full shadow-sm"
+            />
+          </div>
+        )}
+        {isSender && (
+          <div className="mb-1 self-end mr-1">
+            <Avatar
+              width={28}
+              height={28}
+              imageUrl={userAvatar}
+              className="rounded-full shadow-sm"
             />
           </div>
         )}
 
-        {/* Message timestamp */}
-        <div className="text-xs mt-1 text-gray-400">
-          {moment(msg.createdAt).fromNow()}
+        {/* Chat Bubble */}
+        <div
+          className={`px-3 py-2 rounded-xl text-sm leading-snug ${
+            isSender
+              ? "bg-[#0078FF] text-white rounded-tr-none self-end"
+              : "bg-[#1A1A1A] text-white rounded-tl-none self-start"
+          }`}
+        >
+          <p>{msg.text}</p>
+
+          {msg.imageUrl && (
+            <div className="mt-2">
+              <img
+                src={msg.imageUrl}
+                className="max-w-[180px] w-auto object-contain rounded-md"
+                alt="Message"
+              />
+            </div>
+          )}
+
+          <div className="text-[11px] mt-1 text-gray-400 text-right">
+            {moment(msg.createdAt).fromNow()}
+          </div>
         </div>
       </div>
     </div>
   );
 })}
+
   {/* Typing Indicator */}
   {isTyping && randomUser && (
   <div className="flex items-center gap-2 mt-4 ml-2">
@@ -478,7 +513,7 @@ const RandomChatPage = () => {
 
 
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-        <h1 className="text-5xl font-bold text-red-400 opacity-10 select-none">Qchat</h1>
+        <h1 className="text-5xl font-bold text-red-400 opacity-10 select-none">Qchatt</h1>
       </div>
     </div>
   );

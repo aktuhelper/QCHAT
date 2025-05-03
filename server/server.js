@@ -64,7 +64,9 @@ handleSocketConnection(io);
 // WebSocket events
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
-
+  socket.on("user-joined", (userId) => {
+    socket.userId = userId; // Save it on the socket for disconnect reference
+});
   // Register user
   socket.on('register-user', (userId) => {
     userSockets[userId] = socket.id;

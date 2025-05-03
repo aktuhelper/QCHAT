@@ -11,10 +11,12 @@ export const startChat = (io, socket, userId) => {
     console.log(`User ${userId} wants to chat`);
 
     // Prevent duplicate users in the waiting list
-    if (userSocketMap[userId]) {
-        console.log(`User ${userId} is already in a chat or waiting.`);
-        return;
+    if (userSocketMap[userId] && userSocketMap[userId] !== socket.id) {
+        console.log(`User ${userId} had an old socket, replacing with new one.`);
+        userSocketMap[userId] = socket.id;
+        waitingUsers = waitingUsers.filter(user => user.userId !== userId); // Remove old entry
     }
+    
 
     // Add the user to the waiting list
     waitingUsers.push({ userId, socketId: socket.id });
@@ -98,31 +100,19 @@ export const sendMessage = (io, chatRoomId, senderId, message) => {
 export const handleDisconnect = (socket, io) => {
     console.log(`User disconnected: ${socket.id}`);
 
-    // Check if the user was waiting
+    // Remove from waiting list
     waitingUsers = waitingUsers.filter(user => user.socketId !== socket.id);
 
-    // Check if the user was in an active chat
-    let userId = null;
-    for (let id in userSocketMap) {
-        if (userSocketMap[id] === socket.id) {
-            userId = id;
-            break;
-        }
-    }
-
+    const userId = socket.userId;
     if (userId) {
         delete userSocketMap[userId];
 
-        // Find and notify the chat partner
         for (let chatRoomId in activeChats) {
             if (activeChats[chatRoomId].users[userId]) {
                 const partnerId = Object.keys(activeChats[chatRoomId].users).find(id => id !== userId);
                 const partnerSocketId = activeChats[chatRoomId].users[partnerId];
 
-                console.log(`Notifying ${partnerId} that ${userId} has disconnected`);
                 io.to(partnerSocketId).emit('chat-ended', "Partner disconnected");
-
-                // Remove chat room
                 delete activeChats[chatRoomId];
                 break;
             }
