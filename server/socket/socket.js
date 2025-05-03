@@ -30,7 +30,7 @@ export const handleSocketConnection = (io) => {
         if (user && user._id) {
             userSockets.set(user._id.toString(), socket.id);
             onlineUsers.set(user._id.toString(), user);
-            io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+            io.emit("onlineUsers", Array.from(onlineUsers.keys())); // Emit to all clients
         } else {
             console.error('User or user._id is undefined');
             socket.disconnect();
@@ -40,6 +40,8 @@ export const handleSocketConnection = (io) => {
         // Send chat list on connection
         const chatList = await getConversation(userId);
         socket.emit("conversation", chatList);
+
+        // Fetch conversations on demand
         socket.on("fetchConversations", async () => {
             try {
                 const chatList = await getConversation(userId);
@@ -110,98 +112,99 @@ export const handleSocketConnection = (io) => {
                     io.to(senderSocket).emit("messagesRead", conversation._id);
                 }
             } catch (error) {
-                console.error("Error fetching messages:", error);
+                console.error("Error fetching messages:", error.message);
             }
         });
 
         // Handle new messages
         socket.on("newMessage", async (data, callback) => {
             try {
-              const { senderId, receiverId, text, imageUrl, videoUrl } = data;
-          
-              if (!senderId || !receiverId) {
-                return callback({ success: false, error: "Missing senderId or receiverId" });
-              }
-          
-              if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
-                return callback({ success: false, error: "Invalid senderId or receiverId" });
-              }
-          
-              let conversation = await ConversationModel.findOne({
-                "$or": [
-                  { sender: senderId, receiver: receiverId },
-                  { sender: receiverId, receiver: senderId },
-                ],
-              });
-          
-              if (!conversation) {
-                conversation = new ConversationModel({ sender: senderId, receiver: receiverId, messages: [] });
-                await conversation.save();
-              }
-          
-              const message = new MessageModel({
-                text: text,
-                imageUrl: imageUrl || "",
-                videoUrl: videoUrl || "",
-                msgByUserId: senderId,
-                seen: false,
-              });
-          
-              await message.save();
-              conversation.messages.push(message._id);
-              await conversation.save();
-          
-              const updatedConversation = await ConversationModel.findById(conversation._id).populate("messages");
-              const updatedMessages = updatedConversation.messages.map(msg => ({
-                ...msg.toObject(),
-                senderId: msg.msgByUserId,
-              }));
-          
-              const senderSocket = userSockets.get(senderId.toString());
-              const receiverSocket = userSockets.get(receiverId.toString());
-          
-              if (senderSocket) {
-                io.to(senderSocket).emit("message", updatedMessages);
-              }
-          
-              if (receiverSocket) {
-                const senderUser = await usermodel.findById(senderId).select("name _id profile_pic");
-                const receiverUser = await usermodel.findById(receiverId).select("name _id profile_pic");
-          
-                // ✅ Emit the `newMessage` event for the frontend listener
-                console.log("📤 Emitting newMessage to:", receiverSocket);
-                io.to(receiverSocket).emit("newMessage", {
-                  sender: senderUser,
-                  receiver: receiverUser,
-                  text,
-                  imageUrl,
-                  videoUrl,
-                  _id: message._id,
-                  createdAt: message.createdAt,
+                const { senderId, receiverId, text, imageUrl, videoUrl } = data;
+
+                if (!senderId || !receiverId) {
+                    return callback({ success: false, error: "Missing senderId or receiverId" });
+                }
+
+                if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
+                    return callback({ success: false, error: "Invalid senderId or receiverId" });
+                }
+
+                let conversation = await ConversationModel.findOne({
+                    "$or": [
+                        { sender: senderId, receiver: receiverId },
+                        { sender: receiverId, receiver: senderId },
+                    ],
                 });
-          
-                io.to(receiverSocket).emit("message-user", { online: true });
-              }
-          
-              // Refresh chat lists for both users
-              const senderChatList = await getConversation(senderId);
-              const receiverChatList = await getConversation(receiverId);
-          
-              if (senderSocket) io.to(senderSocket).emit("conversation", senderChatList);
-              if (receiverSocket) io.to(receiverSocket).emit("conversation", receiverChatList);
-          
-              // Send callback
-              if (callback && typeof callback === "function") {
-                callback({ success: true, messages: updatedMessages });
-              }
+
+                if (!conversation) {
+                    conversation = new ConversationModel({ sender: senderId, receiver: receiverId, messages: [] });
+                    await conversation.save();
+                }
+
+                const message = new MessageModel({
+                    text: text,
+                    imageUrl: imageUrl || "",
+                    videoUrl: videoUrl || "",
+                    msgByUserId: senderId,
+                    seen: false,
+                });
+
+                await message.save();
+                conversation.messages.push(message._id);
+                await conversation.save();
+
+                const updatedConversation = await ConversationModel.findById(conversation._id).populate("messages");
+                const updatedMessages = updatedConversation.messages.map(msg => ({
+                    ...msg.toObject(),
+                    senderId: msg.msgByUserId,
+                }));
+
+                const senderSocket = userSockets.get(senderId.toString());
+                const receiverSocket = userSockets.get(receiverId.toString());
+
+                if (senderSocket) {
+                    io.to(senderSocket).emit("newMessage", {
+                        sender: await usermodel.findById(senderId).select("name _id profile_pic"),
+                        receiver: await usermodel.findById(receiverId).select("name _id profile_pic"),
+                        text,
+                        imageUrl,
+                        videoUrl,
+                        _id: message._id,
+                        createdAt: message.createdAt,
+                    });
+                }
+
+                if (receiverSocket) {
+                    io.to(receiverSocket).emit("newMessage", {
+                        sender: await usermodel.findById(senderId).select("name _id profile_pic"),
+                        receiver: await usermodel.findById(receiverId).select("name _id profile_pic"),
+                        text,
+                        imageUrl,
+                        videoUrl,
+                        _id: message._id,
+                        createdAt: message.createdAt,
+                    });
+                    io.to(receiverSocket).emit("message-user", { online: true });
+                }
+
+                // Refresh chat lists for both users
+                const senderChatList = await getConversation(senderId);
+                const receiverChatList = await getConversation(receiverId);
+
+                if (senderSocket) io.to(senderSocket).emit("conversation", senderChatList);
+                if (receiverSocket) io.to(receiverSocket).emit("conversation", receiverChatList);
+
+                // Send callback
+                if (callback && typeof callback === "function") {
+                    callback({ success: true, messages: updatedMessages });
+                }
             } catch (error) {
-              console.error("Error handling new message:", error);
-              if (callback && typeof callback === "function") {
-                callback({ success: false, error: "Failed to send message" });
-              }
+                console.error("Error handling new message:", error.message);
+                if (callback && typeof callback === "function") {
+                    callback({ success: false, error: "Failed to send message" });
+                }
             }
-          });
-          
+        });
 
         // Handle user disconnect gracefully
         socket.on("disconnect", () => {

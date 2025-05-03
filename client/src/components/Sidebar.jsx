@@ -25,34 +25,33 @@ const Sidebar = () => {
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loadingConversations, setLoadingConversations] = useState(true);
+
+  // Increment unread count for a specific user
   const incrementUnread = (userId) => {
     setUnreadCounts((prev) => ({
       ...prev,
       [userId]: (prev[userId] || 0) + 1,
     }));
   };
+
+  // Clear unread count for a specific user
   const clearUnreadFor = (userId) =>
     setUnreadCounts((prev) => {
       const updated = { ...prev };
       delete updated[userId];
       return updated;
     });
-  
+
   useEffect(() => {
-    const savedUnread = localStorage.getItem("unreadCounts");
+    const savedUnread = localStorage.getItem('unreadCounts');
     if (savedUnread) {
       try {
         setUnreadCounts(JSON.parse(savedUnread));
       } catch (err) {
-        console.error("Failed to parse unreadCounts from localStorage", err);
+        console.error('Failed to parse unreadCounts from localStorage', err);
       }
     }
   }, []);
-  
- 
-  
-  
-   // Only re-run effect if socket or userdata._id changes
 
   // Fetch Friend Requests
   const fetchFriendRequests = useCallback(async () => {
@@ -65,7 +64,7 @@ const Sidebar = () => {
     } finally {
       setLoadingFriendRequests(false);
     }
-  }, [userdata, backendUrl]);
+  }, [userdata._id, backendUrl]);
 
   // Fetch Friends
   const fetchFriends = useCallback(async () => {
@@ -78,9 +77,7 @@ const Sidebar = () => {
     } finally {
       setLoadingFriends(false);
     }
-  }, [userdata, backendUrl]);
-
-
+  }, [userdata._id, backendUrl]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -94,74 +91,72 @@ const Sidebar = () => {
         if (savedFriends) setFriends(JSON.parse(savedFriends));
       }
     };
-  
-    if (userdata?._id) fetchData();
-  }, [userdata?._id]);
-  
-  
 
-  // Fetch Conversations from localStorage or server
- 
+    if (userdata?._id) fetchData();
+  }, [userdata?._id, fetchFriends, fetchFriendRequests]);
 
   // Listen for online users and update online status
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("onlineUsers", (onlineUserIds) => {
-      setOnlineUsers(onlineUserIds); // Update the state with the online users
-    });
+    const handleOnlineUsers = (onlineUserIds) => {
+      setOnlineUsers(onlineUserIds);
+    };
 
-    // Cleanup the socket listener when the component unmounts or dependencies change
+    socket.on('onlineUsers', handleOnlineUsers);
+
     return () => {
-      socket.off("onlineUsers"); // Clean up the socket listener
+      socket.off('onlineUsers', handleOnlineUsers);
     };
   }, [socket]);
 
+  // Handle new messages and update unread counts
   useEffect(() => {
-    
     if (!socket || !userdata?._id) return;
   
-    // Define the handleNewMessage function inside the useEffect hook
+    // Handle new message and update the unread count only for the receiver
     const handleNewMessage = (msg) => {
-      console.log("📩 Received newMessage:", msg);
+      console.log('📩 Received newMessage:', msg);
   
       // Ensure the message contains sender and receiver IDs
       if (!msg?.sender?._id || !msg?.receiver?._id) {
-        console.warn("Invalid message structure:", msg);
+        console.warn('Invalid message structure:', msg);
         return;
       }
   
-      // Determine the other user's ID
-      const otherUserId = msg.sender._id === userdata._id ? msg.receiver._id : msg.sender._id;
+      // Check if the current user is the receiver (not the sender)
+      const isReceiver = msg.receiver._id === userdata._id;
   
-      // Call incrementUnread with the other user's ID
-      incrementUnread(otherUserId);
+      if (isReceiver) {
+        // Increment unread count for the receiver (only the receiver should have the unread count)
+        const otherUserId = msg.sender._id; // This is the sender's ID
+        incrementUnread(otherUserId); // This should update only the receiver's unread count
+      }
     };
   
     // Set up the listener for 'newMessage' event
-    socket.on("newMessage", handleNewMessage);
+    socket.on('newMessage', handleNewMessage);
   
     // Clean up the listener when the component unmounts or dependencies change
     return () => {
-      socket.off("newMessage", handleNewMessage);
+      socket.off('newMessage', handleNewMessage);
     };
-  
   }, [socket, userdata?._id]);  // Dependencies: socket and userdata
-  
-  
-  useEffect(() => {
-    localStorage.setItem("unreadCounts", JSON.stringify(unreadCounts));
-  }, [unreadCounts]);
   
 
   useEffect(() => {
-    if (!userdata || !userdata._id) return;
+    localStorage.setItem('unreadCounts', JSON.stringify(unreadCounts));
+  }, [unreadCounts]);
+
+  // Fetch conversations
+  useEffect(() => {
+    if (!socket || !userdata?._id) return;
+
     const fetchConversations = () => {
       setLoadingConversations(true);
-      socket.emit("fetchConversations"); // Always fetch fresh data
+      socket.emit('fetchConversations');
     };
-    
-  
+
     const handleConversations = (convos) => {
       if (Array.isArray(convos) && convos.length > 0) {
         setConversations(convos);
@@ -171,48 +166,43 @@ const Sidebar = () => {
       }
       setLoadingConversations(false);
     };
-  
+
     fetchConversations();
-    socket.on("conversation", handleConversations);
-  
+    socket.on('conversation', handleConversations);
+
     return () => {
-      socket.off("conversation", handleConversations);
+      socket.off('conversation', handleConversations);
     };
-  }, [socket, userdata && userdata._id]);
-  
+  }, [socket, userdata?._id]);
 
-
+  // Register the user with the socket
   useEffect(() => {
     if (socket && userdata?._id) {
-      socket.emit("register-user", userdata._id);
+      socket.emit('register-user', userdata._id);
     }
   }, [socket, userdata?._id]);
-  
 
+  // Listen for friend request events
   useEffect(() => {
-    console.log("🧲 Setting up friend request listener...");
     if (!socket || !userdata?._id) return;
-  
-    // Listen for friend request event
-    socket.on('receive-friend-request', (newRequest) => {
-      console.log("📩 New Friend Request Received:", newRequest);
-  
-      // Add the new friend request to the local state
+
+    const handleFriendRequestReceived = (newRequest) => {
+      console.log('📩 New Friend Request Received:', newRequest);
       setFriendRequests((prevRequests) => {
         const updatedRequests = [...prevRequests, newRequest];
         localStorage.setItem('friendRequests', JSON.stringify(updatedRequests));
         return updatedRequests;
       });
-  
       toast.info('You have a new friend request!');
-    });
-  
-    // Cleanup the socket listener when the component unmounts
+    };
+
+    socket.on('receive-friend-request', handleFriendRequestReceived);
+
     return () => {
-      socket.off('friendRequestReceived');
+      socket.off('receive-friend-request', handleFriendRequestReceived);
     };
   }, [socket, userdata?._id]);
-  
+
   const handleLogout = async (e) => {
     e.preventDefault();
     try {
@@ -240,37 +230,38 @@ const Sidebar = () => {
         return updated;
       });
 
-      // ✅ Re-fetch from backend to ensure consistent data
       await fetchFriends();
-
       toast.success('Friend request accepted!');
     } catch {
       toast.error('Error accepting friend request.');
     }
   };
 
-const handleRejectRequest = async (requestId) => {
-  const userId = userdata._id;
-  try {
-    // Reject friend request on the backend
-    await axios.post(`${backendUrl}/api/friends/reject/${requestId}`, { userId });
+  const handleRejectRequest = async (requestId) => {
+    const userId = userdata._id;
+    try {
+      await axios.post(`${backendUrl}/api/friends/reject/${requestId}`, { userId });
 
-    // Update the local state and remove the rejected request
-    setFriendRequests((prev) => {
-      const updated = prev.filter((r) => r._id !== requestId);
-      localStorage.setItem('friendRequests', JSON.stringify(updated));
+      setFriendRequests((prev) => {
+        const updated = prev.filter((r) => r._id !== requestId);
+        localStorage.setItem('friendRequests', JSON.stringify(updated));
+        return updated;
+      });
+
+      await fetchFriendRequests();
+      toast.error('Friend request rejected.');
+    } catch {
+      toast.error('Error rejecting friend request.');
+    }
+  };
+
+  const handleMessageClick = (friend) => {
+    setUnreadCounts((prev) => {
+      const updated = { ...prev };
+      delete updated[friend._id];  // Clear the unread count for this friend
       return updated;
     });
-
-    // Re-fetch friend requests to ensure that the backend and frontend are synced
-    await fetchFriendRequests();
-
-    toast.error("Friend request rejected.");
-  } catch {
-    toast.error('Error rejecting friend request.');
-  }
-};
-
+  };
 
   if (!userdata) return <div className="text-white p-4">Loading...</div>;
 
@@ -281,7 +272,7 @@ const handleRejectRequest = async (requestId) => {
       {/* Desktop Sidebar */}
           {/* Mobile/Tablet Top Header */}
           <div className="fixed top-0 left-0 right-0 z-50 md:hidden bg-[#161616] h-14 flex items-center justify-between px-4 shadow-md">
-  <h1 className="text-2xl font-bold text-red-400">Qchat</h1>
+  <h1 className="text-2xl font-bold text-red-400">Qchatt</h1>
   <button
     onClick={() => setIsEditUserOpen(true)}
     title={userdata?.name}

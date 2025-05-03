@@ -9,11 +9,11 @@ import { AppContent } from '../context/AppContext';
 import axios from 'axios';
 import EmojiPicker from 'emoji-picker-react';
 import { useNavigate } from 'react-router-dom';
-
+import { useLayoutEffect } from 'react';
 const MessagePage = () => {
   const { userId } = useParams();
-  const location = useLocation();
-  const { recipient } = location.state || {}; // Get the recipient from the state
+  const currentMessage = useRef(null);
+  const location = useLocation(); // Get the recipient from the state
   const { socket, userdata, backendUrl } = useContext(AppContent);
   const [isTyping, setIsTyping] = useState(false);
   const navigate = useNavigate();
@@ -23,7 +23,6 @@ const MessagePage = () => {
   const [showFriendDialog, setShowFriendDialog] = useState(false);
   const [friendRequestSent, setFriendRequestSent] = useState(false);
   const [isLoadingImage, setIsLoadingImage] = useState(false); // For loading state
-  const currentMessage = useRef(null);
   const [previewImage, setPreviewImage] = useState("");
   const [isCheckingFriendStatus, setIsCheckingFriendStatus] = useState(false);
   const [conversationId, setConversationId] = useState(null); // Track conversation ID
@@ -33,14 +32,28 @@ const MessagePage = () => {
   const [friendStatusMessage, setFriendStatusMessage] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deletionMessage, setDeletionMessage] = useState("");
+  const [recipient, setRecipient] = useState(null);
 
-  // Fetch conversation ID and load previous messages
+  const [deletionMessage, setDeletionMessage] = useState("");
+  
+  useEffect(() => {
+    if (userId) {
+      axios.get(`${backendUrl}/api/users/${userId}`)
+        .then((res) => {
+          setRecipient(res.data);
+          console.log("✅ Fetched recipient data:", res.data);
+        })
+        .catch((err) => {
+          console.error("❌ Error fetching recipient data:", err);
+        });
+    }
+  }, [userId, backendUrl]);
 
   const handleVideoCall = () => {
-    // Assuming you have a video call page or component
-    navigate(`/videoCall/${recipient._id}`);  // Example path for a video call page
+    // Navigate to the video call page, passing recipient's _id in the URL
+    navigate(`/videoCall/${recipient._id}`);
   };
+  
   const fetchConversationId = async () => {
     if (!userId || !recipient?._id) return;
 
@@ -55,15 +68,29 @@ const MessagePage = () => {
       console.error("Error fetching conversation ID:", error);
     }
   };
+
   useEffect(() => {
-      fetchConversationId();
-  }, []);
-  
+    fetchConversationId();
+  }, [userId, recipient?._id]);
+
   useEffect(() => {
     scrollToBottom();
-  }, []);
+  }, [allMessages]); 
+
   useEffect(() => {
-    // Retrieve messages from localStorage
+    if (!conversationId) return;
+
+    try {
+      const storedMessages = localStorage.getItem(`messages_${conversationId}`);
+      const parsedMessages = JSON.parse(storedMessages || '[]');
+      setAllMessages(Array.isArray(parsedMessages) ? parsedMessages : []);
+    } catch (error) {
+      console.error('Error parsing messages from localStorage:', error);
+      setAllMessages([]);
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
     try {
       const messages = JSON.parse(localStorage.getItem('allMessages') || '[]');
       setAllMessages(Array.isArray(messages) ? messages : []);
@@ -71,14 +98,12 @@ const MessagePage = () => {
       console.error('Error parsing messages from localStorage:', error);
       setAllMessages([]);
     }
-  
+
     if (!socket || !userId || !recipient?._id) return;
-  
+
     socket.emit('message-page', userId);
-  
-    // Define socket event handlers
+
     const handleMessageUser = (data) => setRecipientStatus(data.online ? 'Online' : 'Offline');
-    
     const handleMessage = (data) => {
       if (Array.isArray(data?.messages)) {
         setAllMessages(data.messages);
@@ -91,27 +116,11 @@ const MessagePage = () => {
         setAllMessages([]);
       }
     };
-  
-    const handleReceiveMessage = (newMessage) => {
-      if (
-        (newMessage.receiverId === userId && newMessage.senderId === recipient?._id) ||
-        (newMessage.senderId === userId && newMessage.receiverId === recipient?._id)
-      ) {
-        setAllMessages((prev) => {
-          if (!Array.isArray(prev)) return [newMessage];
-          if (!prev.some((msg) => msg._id === newMessage._id)) {
-            return [...prev, newMessage];
-          }
-          return prev;
-        });
-        fetchConversationId();
-      }
-    };
-  
+
     const handleOnlineUsers = (onlineUsers) => {
       setRecipientStatus(onlineUsers.includes(recipient?._id) ? 'Online' : 'Offline');
     };
-  
+
     const handleFriendRequestResponse = (data) => {
       if (data.status === 'sent' || data.status === 'accepted') {
         setFriendRequestSent(true);
@@ -121,112 +130,146 @@ const MessagePage = () => {
         setErrorMessage(data.error);
       }
     };
-  
+
     const handleTyping = (data) => {
       if (data.senderId === recipient?._id) {
         setIsTyping(true);
         if (isUserNearBottom()) scrollToBottom();
       }
     };
-  
+
     const handleStopTyping = (data) => {
       if (data.senderId === recipient?._id) setIsTyping(false);
     };
-  
-    // Register socket events
+
     socket.on('message-user', handleMessageUser);
     socket.on('message', handleMessage);
-    socket.on('receive-message', handleReceiveMessage);
+    socket.on('newMessage', handleReceiveMessage);
     socket.on('onlineUsers', handleOnlineUsers);
     socket.on('friendRequestResponse', handleFriendRequestResponse);
     socket.on('typing', handleTyping);
     socket.on('stop-typing', handleStopTyping);
-  
-    // Cleanup on component unmount
+
     return () => {
       socket.off('message-user', handleMessageUser);
       socket.off('message', handleMessage);
-      socket.off('receive-message', handleReceiveMessage);
+      socket.off('newMessage', handleReceiveMessage);
       socket.off('onlineUsers', handleOnlineUsers);
       socket.off('friendRequestResponse', handleFriendRequestResponse);
       socket.off('typing', handleTyping);
       socket.off('stop-typing', handleStopTyping);
     };
-  }, [socket, userId, recipient?._id]); // Ensure only necessary dependencies are included
-  
+  }, [socket, userId, recipient]);
+
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (currentMessage.current) {
         currentMessage.current.scrollIntoView({ behavior: 'smooth' });
       }
-    }, 100); // Short delay ensures the message renders before scroll
-  
+    }, 100);
+
     return () => clearTimeout(timeout);
   }, [allMessages]);
-  
+
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (!message.text.trim() && !message.imageUrl) return; // Prevent sending if the message is empty or just whitespace
+    if (!message.text.trim() && !message.imageUrl) return;
     if (!userdata?._id) return;
-  
-    const tempMessageId = Date.now().toString(); // Using timestamp-based ID
-  
+
+    const tempMessageId = Date.now().toString();
+
     const newMessage = {
       _id: tempMessageId,
-      senderId: userdata._id, // Sender is the logged-in user
-      receiverId: userId, // Receiver is the intended user
+      senderId: userdata._id,
+      receiverId: userId,
       text: message.text,
       imageUrl: message.imageUrl,
       createdAt: new Date().toISOString(),
     };
-  
+
     setAllMessages((prev) => [...prev, newMessage]);
-  
+
     socket.emit('newMessage', newMessage, (serverResponse) => {
       if (serverResponse?.success) {
-        setAllMessages(serverResponse.messages); // Update messages with the latest from the server
-        socket.emit('fetchConversations'); // Fetch the latest conversations from the server
-        fetchConversationId(); // Fetch the conversation ID immediately after sending a message
+        setAllMessages(serverResponse.messages);
+        socket.emit('fetchConversations');
+        fetchConversationId();
       } else {
-        setAllMessages((prev) => prev.filter(msg => msg._id !== tempMessageId)); // Remove temporary message if sending failed
+        setAllMessages((prev) => prev.filter(msg => msg._id !== tempMessageId));
       }
     });
-  
-    // Clear the message and preview image after sending
+
     setMessage({ text: "", imageUrl: "" });
-    setPreviewImage(""); // Clear the image preview
+    setPreviewImage("");
+
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   };
+
+  const handleReceiveMessage = (newMessage) => {
+    if (!userdata?._id || !recipient?._id) {
+      console.warn("🚫 Missing userdata._id or recipient._id, skipping message display.");
+      return;
+    }
+
+    const senderId = newMessage.senderId || newMessage.sender?._id;
+    const receiverId = newMessage.receiverId || newMessage.receiver?._id;
+
+    const isCurrentChat = 
+      (senderId === userdata._id && receiverId === recipient._id) || 
+      (senderId === recipient._id && receiverId === userdata._id);
+
+    if (isCurrentChat) {
+      setAllMessages((prev) => {
+        if (!Array.isArray(prev)) {
+          const updated = [newMessage];
+          return updated;
+        }
+
+        const alreadyExists = prev.some((msg) => msg._id === newMessage._id);
+        if (!alreadyExists) {
+          const updated = [...prev, newMessage];
+          return updated;
+        } 
+        return prev;
+      });
+
+      fetchConversationId();
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (currentMessage.current) {
+      currentMessage.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [allMessages]);
 
   const handleSendImage = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    setIsLoadingImage(true); // Start loading state
+    setIsLoadingImage(true);
 
     const reader = new FileReader();
     reader.onloadend = () => {
       setMessage((prev) => ({ ...prev, imageUrl: reader.result }));
-      setPreviewImage(reader.result);  // Set preview image URL
-      setIsLoadingImage(false); // End loading state
+      setPreviewImage(reader.result);
+      setIsLoadingImage(false);
     };
     reader.readAsDataURL(file);
   };
 
   const handleCancelImagePreview = () => {
-    setPreviewImage(""); // Clear the preview image
-    setMessage((prev) => ({ ...prev, imageUrl: "" })); // Clear imageUrl from message state
+    setPreviewImage("");
+    setMessage((prev) => ({ ...prev, imageUrl: "" }));
   };
-useEffect(() => {
-  if (conversationId) {
-    localStorage.setItem("conversationId", conversationId);
-  }
-}, [conversationId]);
-useEffect(() => {
-  const storedId = localStorage.getItem("conversationId");
-  if (storedId) {
-    setConversationId(storedId);
-  }
-}, []);
+
+  useEffect(() => {
+    if (conversationId) {
+      localStorage.setItem(`messages_${conversationId}`, JSON.stringify(allMessages));
+    }
+  }, [allMessages, conversationId]);
 
   const handleDeleteConversation = async () => {
     if (!conversationId) {
@@ -237,13 +280,13 @@ useEffect(() => {
     setIsDeleting(true);
     try {
       const response = await axios.delete(
-`${backendUrl}/api/auth/deleteConversation/${conversationId}`,
-{
-        headers: {
-Authorization: `Bearer ${userdata.token}`,
-},
-      }
-);
+        `${backendUrl}/api/auth/deleteConversation/${conversationId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${userdata.token}`,
+          },
+        }
+      );
 
       if (response.status === 200 || response.status === 204 || response.data.success) {
         setAllMessages([]);
@@ -261,16 +304,17 @@ Authorization: `Bearer ${userdata.token}`,
       setIsDeleting(false);
     }
   };
+
   const handleSendFriendRequest = async () => {
     if (!userdata?._id || friendStatus === "You are already friends." || isCheckingFriendStatus) return;
     setIsCheckingFriendStatus(true);
-  
+
     try {
       const { data } = await axios.get(
         `${backendUrl}/api/user/${userdata._id}/friend-status/${userId}`,
         { headers: { Authorization: `Bearer ${userdata.token}` } }
       );
-  
+
       if (data.isAlreadyFriends) {
         setFriendStatus("You are already friends.");
         setFriendStatusMessage("You are already friends.");
@@ -284,37 +328,35 @@ Authorization: `Bearer ${userdata.token}`,
       setIsCheckingFriendStatus(false);
     }
   };
-  
 
-  
   const handleCloseDialog = () => {
     setShowFriendDialog(false);
     setFriendRequestSent(false);
-    setErrorMessage(""); // Clear the error message when closing the dialog
+    setErrorMessage(""); 
   };
+
   const typingTimeout = useRef(null);
 
   const handleInputChange = (e) => {
     const text = e.target.value;
     setMessage((prev) => ({ ...prev, text }));
-  
+
     if (!socket || !userdata?._id || !userId) return;
-    
+
     socket.emit("typing", { senderId: userdata._id, receiverId: userId });
-  
+
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => {
       socket.emit("stop-typing", { senderId: userdata._id, receiverId: userId });
     }, 1500);
   };
-  
 
   const handleCheckFriendStatus = async () => {
     if (!userdata || !userdata._id) {
       console.log("User data is not available.");
-      return; // Stop execution if userdata or userdata._id is missing
+      return;
     }
-  
+
     try {
       const response = await axios.get(
         `${backendUrl}/api/user/${userdata._id}/friend-status/${userId}`,
@@ -324,34 +366,36 @@ Authorization: `Bearer ${userdata.token}`,
           },
         }
       );
-  
+
       if (response.data.isAlreadyFriends) {
         setFriendStatus("You are already friends.");
         setFriendRequestSent(false);
-        setFriendStatusMessage("You are already friends."); // Update message when already friends
+        setFriendStatusMessage("You are already friends.");
       } else {
-        setFriendStatus(""); // Reset friend status if not friends yet
-        setFriendStatusMessage(""); // Reset message
+        setFriendStatus(""); 
+        setFriendStatusMessage(""); 
       }
     } catch (error) {
       console.log("Error checking friend status:", error);
       setFriendStatusMessage("Error checking friend status. Please try again.");
     }
   };
+
   const scrollToBottom = () => {
     currentMessage.current?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   const isUserNearBottom = () => {
     const messageContainer = document.querySelector('section.flex-1.overflow-y-auto');
     if (!messageContainer) return true;
-  
-    const threshold = 100; // px from bottom to consider "near bottom"
+
+    const threshold = 100;
     const position = messageContainer.scrollTop + messageContainer.clientHeight;
     const height = messageContainer.scrollHeight;
-  
+
     return height - position < threshold;
   };
+
 
   return (
     <div className="h-screen flex flex-col text-white bg-[url('../assets/bg.jpg')] bg-cover bg-center bg-no-repeat relative">
@@ -417,44 +461,40 @@ Authorization: `Bearer ${userdata.token}`,
         </div>
       </header>
 
-      {/* Chat Messages */}
       <section className="flex-1 overflow-y-auto px-4 py-2">
   <div className="flex flex-col gap-2">
-  {allMessages.map((msg, index) => {
-  const isLastMessage = index === allMessages.length - 1;
+    {allMessages.map((msg, index) => {
+      const isLastMessage = index === allMessages.length - 1;
 
-  return (
-    <div
-      key={msg._id || `${index}-${msg.text}`} // <-- ADD THIS
-      ref={isLastMessage ? currentMessage : null}
-      className={`flex justify-${msg.senderId === userdata?._id ? 'end' : 'start'} p-3 rounded-3xl min-w-[120px] min-h-[40px] shadow-lg`}
-    >
-      <div
-        className={`${
-          msg.senderId === userdata?._id
-            ? 'bg-[#0078FF] text-white max-w-[45%] ml-auto'
-            : 'bg-[#1A1A1A] text-white max-w-[50%] mr-auto'
-        } p-3 rounded-3xl`}
-      >
-        {msg.imageUrl && (
-          <img
-            src={msg.imageUrl}
-            className="max-w-full max-h-80 w-auto object-contain rounded-lg"
-            alt="Message"
-          />
-        )}
-        <p className="text-sm break-words">{msg.text}</p>
-        <p className="text-xs text-gray-200 text-right">
-          {moment(msg.createdAt).format('hh:mm A')}
-        </p>
-      </div>
-    </div>
-  );
-})}
-
-
-
-    {/* Typing Indicator Bubble (receiver side) */}
+      return (
+        <div
+          key={msg._id || `${index}-${msg.text}`} 
+          ref={isLastMessage ? currentMessage : null} // Assign ref only to the last message
+          className={`flex justify-${msg.senderId === userdata?._id ? 'end' : 'start'} p-3 rounded-3xl min-w-[120px] min-h-[40px] shadow-lg`}
+        >
+          <div
+            className={`${
+              msg.senderId === userdata?._id
+                ? 'bg-[#0078FF] text-white max-w-[45%] ml-auto'
+                : 'bg-[#1A1A1A] text-white max-w-[50%] mr-auto'
+            } p-3 rounded-3xl`}
+          >
+            {msg.imageUrl && (
+              <img
+                src={msg.imageUrl}
+                className="max-w-full max-h-80 w-auto object-contain rounded-lg"
+                alt="Message"
+              />
+            )}
+            <p className="text-sm break-words">{msg.text}</p>
+            <p className="text-xs text-gray-200 text-right">
+              {moment(msg.createdAt).format('hh:mm A')}
+            </p>
+          </div>
+        </div>
+      );
+    })}
+    {/* Add the typing indicator */}
     {isTyping && (
       <div className="flex justify-start p-3 rounded-3xl">
         <div className="bg-[#1A1A1A] text-white max-w-[50%] p-3 rounded-3xl">
@@ -467,9 +507,10 @@ Authorization: `Bearer ${userdata.token}`,
       </div>
     )}
 
-    <div ref={currentMessage}></div>
+    <div ref={currentMessage}></div> {/* This is the final element we scroll to */}
   </div>
 </section>
+
 
 
       {/* Message Input */}
