@@ -157,8 +157,8 @@ export const verifyEmail = async (req, res) => {
     const mailOptions = {
       from: process.env.SENDER_EMAIL,
       to: user.email,
-      subject: 'Welcome to Chattsphere',
-      text: `Welcome to Chattsphere! Your account has been created successfully with email id: ${user.email}`,
+      subject: 'Welcome to Qchatt',
+      text: `Welcome to Qchatt! Your account has been created successfully with email id: ${user.email}`,
     };
 
     await transporter.sendMail(mailOptions);
