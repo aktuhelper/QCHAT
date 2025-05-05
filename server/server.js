@@ -31,7 +31,7 @@ const port = process.env.PORT || 4000;
 const __dirname= path.resolve();
 connectDB();
 
-const allowedOrigins = ['https://qchat-7gsn.onrender.com'];
+const allowedOrigins = ['https://app.qchatt.com'];
 
 app.use(express.json());
 app.use(cookieParser());
