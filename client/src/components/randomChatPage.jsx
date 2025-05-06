@@ -8,6 +8,7 @@ import { AppContent } from '../context/AppContext';
 import '../App.css';
 import axios from 'axios';
 import EmojiPicker from 'emoji-picker-react';
+import styles from './TypingIndicator.module.css';
 
 const RandomChatPage = () => {
   const { userdata, socket, onlineUsersCount, backendUrl } = useContext(AppContent);
@@ -22,6 +23,7 @@ const RandomChatPage = () => {
   const [popupMessage, setPopupMessage] = useState("");
   const [popupVisible, setPopupVisible] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [currentlyTyping, setCurrentlyTyping] = useState(false);
 
   const [showFriendDialog, setShowFriendDialog] = useState(false);
   const [friendRequestSent, setFriendRequestSent] = useState(false);
@@ -132,25 +134,42 @@ const RandomChatPage = () => {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (!chatStarted || !chatRoomId || (!message.text && !message.imageUrl)) return;
+  
+    if (!chatStarted || !chatRoomId || (!message.text.trim() && !message.imageUrl)) {
+      return;
+    }
+  
+    // Indicate that the user is no longer typing once they send a message
+    socket.emit("typing", chatRoomId, userdata._id, false);
   
     const newMessage = {
       senderId: userdata?._id,
       receiverId: randomUser.userId,
       text: message.text,
-      imageUrl: message.imageUrl,  // Make sure this is included
+      imageUrl: message.imageUrl,  // Ensure the image URL is included if available
       createdAt: new Date().toISOString(),
     };
   
-    console.log("Sending message:", newMessage); // Log to see if imageUrl is included
+    console.log("Sending message:", newMessage);
+  
+    // Emit message to the server through socket
     socket.emit("send-message", chatRoomId, newMessage, (response) => {
-      console.log("Server response:", response);
+      setIsSending(false);  // Stop the loading state after message is sent
+  
+      if (response.error) {
+        console.error("Error sending message:", response.error);
+        // Optionally display an error message to the user
+        setErrorMessage("Failed to send the message. Please try again.");
+      } else {
+        console.log("Server response:", response);
+      }
     });
   
-    setAllMessages(prev => [...prev, newMessage]);
+    setAllMessages((prev) => [...prev, newMessage]);
     setMessage({ text: "", imageUrl: "" });
     setShowEmojiPicker(false);
   };
+  
   
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -231,7 +250,10 @@ const RandomChatPage = () => {
     setMessage({ ...message, text });
   
     if (chatRoomId && userdata?._id) {
-      socket.emit("typing", chatRoomId, userdata._id, true);
+      if (!currentlyTyping) {
+        socket.emit("typing", chatRoomId, userdata._id, true);
+        setCurrentlyTyping(true);
+      }
   
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -239,7 +261,8 @@ const RandomChatPage = () => {
   
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit("typing", chatRoomId, userdata._id, false);
-      }, 1500); // Emit stop typing after 1.5 seconds of inactivity
+        setCurrentlyTyping(false);
+      }, 1500);
     }
   };
   
@@ -399,13 +422,14 @@ const RandomChatPage = () => {
   {isTyping && randomUser && (
   <div className="flex items-center gap-2 mt-4 ml-2">
     <Avatar width={30} height={30} imageUrl={randomUser?.profile_pic} />
-    <div className="typing-indicator text-sm text-gray-300 px-4 py-2 bg-[#2A2A2A] rounded-full flex items-center gap-2">
-      <span className="dot"></span>
-      <span className="dot"></span>
-      <span className="dot"></span>
+    <div className={`${styles.typingIndicator} px-4 py-2 bg-[#2A2A2A] rounded-full`}>
+      <span className={styles.dot}></span>
+      <span className={styles.dot}></span>
+      <span className={styles.dot}></span>
     </div>
   </div>
 )}
+
 </div>
 
 
