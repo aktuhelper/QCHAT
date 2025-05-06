@@ -279,7 +279,7 @@ const Sidebar = () => {
     className="w-9 h-9 rounded-full border-2 border-blue-500 overflow-hidden"
   >
     <Avatar
-      imageUrl={userdata?.profile_pic || "/default.png"}
+      imageUrl={userdata?.profile_pic || "/avtarr.png"}
       name={userdata?.name}
       width={36}
       height={36}
@@ -317,7 +317,7 @@ const Sidebar = () => {
         <div className="flex flex-col items-center">
           <button className="relative mx-auto mb-6 hover:scale-105 transition-transform duration-300" title={userdata?.name} onClick={() => setIsEditUserOpen(true)}>
             <div className="before:absolute before:-inset-1 before:border-2 before:border-blue-500 before:animate before:rounded-full shadow-lg shadow-blue-500/50"></div>
-            <Avatar imageUrl={userdata?.profile_pic || "/default.png"} name={userdata?.name} width={48} height={48} className="rounded-full relative" />
+            <Avatar imageUrl={userdata?.profile_pic || "/avtarr.png"} name={userdata?.name} width={48} height={48} className="rounded-full relative" />
           </button>
           <button onClick={handleLogout} className="w-10 h-10 flex justify-center items-center rounded-full transition-all duration-300 bg-red-600 hover:scale-110 hover:bg-red-700" title="Logout">
             <RiLogoutBoxLine size={22} />
@@ -391,7 +391,7 @@ const Sidebar = () => {
       className="relative flex items-center gap-3 py-3 px-4 sm:px-6 md:px-4 hover:bg-black/40 hover:backdrop-blur-sm rounded-full transition-all duration-200"
     >
       <Avatar
-        imageUrl={friend.profile_pic || "/default.png"}
+        imageUrl={friend.profile_pic || "/avtarr.png"}
         name={friend.name}
         width={52}
         height={42}
@@ -458,7 +458,7 @@ const Sidebar = () => {
                   className="relative flex items-center gap-3 py-3 px-2 hover:bg-black/40 hover:backdrop-blur-sm rounded-full cursor-pointer"
                 >
                   <Avatar
-                    imageUrl={otherUser?.profile_pic || "/default.png"}
+                    imageUrl={otherUser?.profile_pic || "/avtarr.png"}
                     name={otherUser?.name}
                     width={55}
                     height={42}
