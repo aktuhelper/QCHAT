@@ -1,19 +1,38 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
-import { assets } from "../assets/assets";
+import { assets } from "../assets/assets.js";
 import { AppContent } from "../context/AppContext";
 
 const Home = () => {
-  const { backendUrl, userdata, socket } = useContext(AppContent);
+  const { backendUrl, userdata, socket, isLoggedin, getUserData } = useContext(AppContent);
   const location = useLocation();
   const navigate = useNavigate();
+  if (isLoggedin === undefined) {
+    return <div className="flex justify-center items-center h-screen text-white">Loading...</div>;
+  }
+  
   const basePath = location.pathname === "/";
   const messages = ["Welcome to Qchatt", "Connect with People"];
   const [text, setText] = useState("");
   const [messageIndex, setMessageIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // 🔐 Redirect unverified users to /email-verify
+  useEffect(() => {
+    if (isLoggedin === false) {
+      navigate("/login");
+    } else if (
+      isLoggedin &&
+      userdata &&
+      !userdata.isAccountverified &&
+      !userdata.isGoogleAuthenticated
+    ) {
+      navigate("/email");
+    }
+  }, [isLoggedin, userdata]);
+  
 
   useEffect(() => {
     const typingSpeed = isDeleting ? 50 : 50;
@@ -51,6 +70,7 @@ const Home = () => {
       <section className={`${basePath ? "hidden" : "block"} w-full`}>
         <Outlet />
       </section>
+
       <div
         className={`justify-center items-center flex-col gap-2 hidden ${!basePath ? "hidden" : "lg:flex"}`}
       >
@@ -63,7 +83,7 @@ const Home = () => {
           />
         </div>
         <p className="text-lg mt-2 text-slate-200">
-          Hi <span className="text-blue-500 font-extrabold text-2xl">{userdata?.name}</span>! {" "}
+          Hi <span className="text-blue-500 font-extrabold text-2xl">{userdata?.name}</span>!{" "}
           <span className="typing-animation">{text}</span>
         </p>
 

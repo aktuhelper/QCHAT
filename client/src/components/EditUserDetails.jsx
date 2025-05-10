@@ -15,7 +15,7 @@ const EditUserDetails = ({ onClose }) => {
   useEffect(() => {
     if (userdata) {
       setName(userdata.name || "Developer");
-      setPreviewImage(userdata.profile_pic || "/default-avatar.png");
+      setPreviewImage(userdata.profile_pic || "/avtarr.png");
     }
   }, [userdata]);
 

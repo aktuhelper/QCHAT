@@ -109,9 +109,9 @@ const ResetPassword = () => {
         </form>
       )}
       {!isOtpSubmit && isEmailSent && (
-        <form onSubmit={onSubmitOtp} className="bg-slate-900 p-6 rounded-lg shadow-lg w-96 text-sm">
+        <form onSubmit={onSubmitOtp} className="bg-[#1A1A1A] p-6 rounded-lg shadow-lg w-96 text-sm">
           <h1 className="text-white text-2xl font-semibold text-center mb-4">Reset Password OTP</h1>
-          <p className="text-center mb-6 text-indigo-300">Enter 6 digit code sent to your Email</p>
+          <p className="text-center mb-6 text-indigo-300">Enter 6 digit code sent to your Email & Check your Spam folder if email not received</p>
 
           <div onPaste={handlePaste} className="flex justify-between mb-8 gap-4">
             {Array(6)
@@ -129,7 +129,7 @@ const ResetPassword = () => {
                 />
               ))}
           </div>
-          <button className="w-full py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-900 text-white rounded-full">
+          <button className="w-full py-2.5 bg-gradient-to-r from-red-500 to-red-900 text-white rounded-full">
             {loading ? (  // Display Loader2 spinner while loading
               <div className="flex justify-center items-center">
                 <Loader2 className="animate-spin mr-2" size={24} />
@@ -143,7 +143,7 @@ const ResetPassword = () => {
       )}
 
       {isOtpSubmit && isEmailSent && (
-        <form onSubmit={onSubmitNewPassword} className="bg-slate-900 p-6 rounded-lg shadow-lg w-96 text-sm">
+        <form onSubmit={onSubmitNewPassword} className="bg-[#1A1A1A] p-6 rounded-lg shadow-lg w-96 text-sm">
           <h1 className="text-white text-2xl font-semibold text-center mb-4">New Password</h1>
           <p className="text-center mb-6 text-indigo-300">Enter new password</p>
           <div className="mb-4 flex items-center gap-3 w-full px-5 py-2 rounded-full bg-[#333A5C]">
@@ -157,7 +157,7 @@ const ResetPassword = () => {
               required
             />
           </div>
-          <button className="w-full py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-900 text-white rounded-full">
+          <button className="w-full py-2.5 bg-gradient-to-r  from-red-500 to-red-900 text-white rounded-full">
             {loading ? (  // Display Loader2 spinner while loading
               <div className="flex justify-center items-center">
                 <Loader2 className="animate-spin mr-2" size={24} />

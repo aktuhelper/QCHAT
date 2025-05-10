@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
+    unique: true,
     trim: true,
   },
   email: {
@@ -15,6 +16,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
+
     required: function () {
       // Password is only required if provider is local
       return !this.provider || this.provider === 'local';

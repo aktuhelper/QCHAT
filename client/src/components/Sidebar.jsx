@@ -444,15 +444,15 @@ const Sidebar = () => {
   </div>
 ) : (
   conversations.map((conv) => {
-    const otherUser = conv.sender._id === userdata._id ? conv.receiver : conv.sender;
+    const otherUser = conv.sender?._id === userdata?._id ? conv.receiver : conv.sender;
     const isOnline = onlineUsers.includes(otherUser?._id);
-    const unread = unreadCounts[otherUser._id] || 0;
+    const unread = unreadCounts[otherUser?._id] || 0;
     return (
       <NavLink
-        to={`/${otherUser._id}`}
+        to={`/${otherUser?._id}`}
         state={{ recipient: otherUser }}
         key={conv._id}
-        onClick={() => clearUnreadFor(otherUser._id)}
+        onClick={() => clearUnreadFor(otherUser?._id)}
 
 
                   className="relative flex items-center gap-3 py-3 px-2 hover:bg-black/40 hover:backdrop-blur-sm rounded-full cursor-pointer"
@@ -466,7 +466,7 @@ const Sidebar = () => {
                   />
                <div className="flex flex-col overflow-hidden w-full">
   <h3 className="truncate font-semibold text-white">
-    {otherUser.name} {isOnline && <span className="text-green-500">⦿</span>}
+    {otherUser?.name} {isOnline && <span className="text-green-500">⦿</span>}
   </h3>
   <div className="text-slate-300 text-xs overflow-hidden whitespace-nowrap text-ellipsis break-all max-w-[160px]">
     {conv?.lastMsg?.imageUrl ? (

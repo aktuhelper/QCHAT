@@ -52,30 +52,55 @@ export const AppContextProvider = (props) => {
       const { data } = await axios.get(`${backendUrl}/api/auth/isauth`);
       if (data.success) {
         setIsLoggedin(true);
-        await getUserData();
+        await getUserData(); // fetch data regardless of verification
       } else {
         setIsLoggedin(false);
-        setUserdata({ name: "", email: "", profile_pic: "", _id: "" });
+        resetUserData();
       }
     } catch (error) {
+      setIsLoggedin(false);
+      resetUserData();
       toast.error(error.response?.data?.message || "Authentication failed");
     }
   };
-
+  
+  
   const getUserData = async () => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/user/data`);
-      if (data.success) {
+      const { data } = await axios.get(`${backendUrl}/api/user/data`, {
+        withCredentials: true,
+      });
+  
+      if (data.success && data.user) {
         setUserdata(data.user);
         setupSocketConnection(data.user._id);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Failed to fetch user data.");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Something went wrong");
+      const status = error.response?.status;
+      const message = error.response?.data?.message;
+  
+      if (status !== 401) {
+        toast.error(message || "Something went wrong");
+      }
+  
+      setIsLoggedin(false);
+      setUserdata(null);
     }
   };
-
+  
+  
+  const resetUserData = () => {
+    setUserdata({
+      name: "",
+      email: "",
+      profile_pic: "",
+      _id: "",
+      isAccountverified: false,
+    });
+  };
+  
   const setupSocketConnection = (userId) => {
     if (!userId || socket) return;
     const socketConnection = io(backendUrl, { query: { userId } });
@@ -114,36 +139,38 @@ export const AppContextProvider = (props) => {
   }, []);
 
   useEffect(() => {
-    if (userdata._id) setupSocketConnection(userdata._id);
-  }, [userdata._id]);
+    if (userdata?._id) setupSocketConnection(userdata?._id);
+  }, [userdata?._id]);
 
   const googleLogin = async (credential) => {
     try {
       const decoded = decodeJwt(credential);
       const { name, email, picture, sub } = decoded;
-
-      if (!userdata.name || !userdata.profile_pic) {
-        setUserdata({
-          name: name || userdata.name,
-          email,
-          profile_pic: picture || userdata.profile_pic,
-          _id: sub,
-        });
-      }
-
+  
+      // Always send token to backend and let backend handle auth & user creation/updating
       const { data } = await axios.post(`${backendUrl}/api/auth/google-login`, { token: credential });
-
+  
       if (data.success) {
+        const user = {
+          ...data.user,
+          // Ensure these are explicitly marked for routing logic
+          isGoogleAuthenticated: true,
+          isAccountverified: true,
+        };
+  
+        setUserdata(user);
         setIsLoggedin(true);
-        toast.success(`Welcome ${name}!`);
-        await getUserData();
+        setupSocketConnection(user._id);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Google login failed.");
       }
-    } catch {
+    } catch (err) {
+      console.error("Google login error:", err);
       toast.error("Google login failed.");
     }
   };
+  
+  
 
   const waitForRef = async (ref, timeout = 2000) => {
     const interval = 100;

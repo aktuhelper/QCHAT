@@ -15,7 +15,7 @@ const UserSearchCard = ({ user, onClose }) => {
       className="p-3 flex items-center gap-3 cursor-pointer hover:bg-black/20 rounded-lg"
     >
       <img
-        src={user.profile_pic || '/default-profile.png'} // Add default image if profile_pic is missing
+        src={user.profile_pic || '/avtarr.png'} // Add default image if profile_pic is missing
         alt="User"
         className="w-10 h-10 rounded-full"
       />

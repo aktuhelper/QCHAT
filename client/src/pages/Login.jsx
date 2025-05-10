@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { assets } from '../assets/assets';
+import { assets } from '../assets/assets.js';
 import { AppContent } from '../context/AppContext';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -48,27 +48,22 @@ const Login = () => {
   const onSubmitHandler = async (e) => {
     e.preventDefault();
     setLoading(true);
-
+  
     try {
       axios.defaults.withCredentials = true;
       let data;
+  
       if (state === 'Sign Up') {
-        data = await axios.post(backendUrl + '/api/auth/register', { name, email, password });
+        data = await axios.post(`${backendUrl}/api/auth/register`, { name, email, password });
+  
         if (data.data.success) {
-          setIsLoggedin(true);
-          getUserData();
-          const otpRes = await axios.post(backendUrl + '/api/auth/send-verify-otp');
-          if (otpRes.data.success) {
-            navigate('/email-verify');
-            toast.success(otpRes.data.message);
-          } else {
-            toast.error(otpRes.data.message);
-          }
-        } else {
-          toast.error(data.data.message);
+          navigate('/email-verify', { state: { email } });
+          toast.success(data.data.message);
+          
         }
       } else {
-        data = await axios.post(backendUrl + '/api/auth/login', { email, password });
+        data = await axios.post(`${backendUrl}/api/auth/login`, { email, password });
+  
         if (data.data.success) {
           setIsLoggedin(true);
           getUserData();
@@ -78,11 +73,20 @@ const Login = () => {
         }
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'An error occurred');
+      const status = error.response?.status;
+      const message = error.response?.data?.message || 'An error occurred';
+  
+      if (status === 409) {
+        toast.error("Email or username already exists.");
+      } 
+      else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
     }
   };
+  
 
   const handleGoogleLogin = async (credentialResponse) => {
     try {

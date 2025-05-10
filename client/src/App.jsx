@@ -1,5 +1,5 @@
 import React, { useContext, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import VerifyEmail from './pages/VerifyEmail';
@@ -13,9 +13,10 @@ import './App.css';
 import VideoCall from './components/Videocall'; // Import your VideoCall component
 import { AppContent } from './context/AppContext';
 import IncomingCallPopup from './components/IncomingCallPopup'; // Import the Incoming Call Popup
+import Email from './pages/email-verify';
 
 const App = () => {
-  const { callIncoming, ringtoneRef } = useContext(AppContent);
+  const { callIncoming, ringtoneRef, userdata } = useContext(AppContent);
 
   useEffect(() => {
     if (callIncoming) {
@@ -25,6 +26,9 @@ const App = () => {
       ringtoneRef.current.currentTime = 0;
     }
   }, [callIncoming, ringtoneRef]);
+
+  // Check if user is logged in via Google and email is verified
+  const isEmailVerified = userdata?.isAccountverified || userdata?.isGoogleAuthenticated;
 
   return (
     <div>
@@ -81,7 +85,15 @@ const App = () => {
         
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
-        <Route path="/email-verify" element={<VerifyEmail />} />
+        {/* Show email verification page only if user is not verified */}
+        <Route
+          path="/email-verify"
+          element={ <VerifyEmail />}
+        />
+           <Route
+          path="/email"
+          element={isEmailVerified ? <Navigate to="/" /> : <Email />}
+        />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </div>
